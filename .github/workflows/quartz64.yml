@@ -19,11 +19,6 @@ jobs:
       CROSS_COMPILE: "aarch64-linux-gnu-"
       ARCH: "arm64"
     steps:
-      - name: Apt update for 'gh act'
-        run: '{ sudo apt-get -q update; }'
-      # https://github.com/hendrikmuhs/ccache-action
-      - name: ccache
-        uses: hendrikmuhs/ccache-action@v1.2
       # https://github.com/actions/setup-python/tags
       - uses: actions/setup-python@v4
         with:
@@ -49,7 +44,6 @@ jobs:
       - name: Build U-Boot
         run: |
           export BL31='bl31.elf'
-          export PATH="/usr/lib/ccache:/usr/local/opt/ccache/libexec:$PATH"
           cd "u-boot-$uboot_branch"
           make quartz64-a-rk3566_defconfig
           make -j$(nproc)
@@ -65,7 +59,6 @@ jobs:
       - name: Build Linux
         run: |
           cd "linux-$linux_version"
-          export PATH="/usr/lib/ccache:/usr/local/opt/ccache/libexec:$PATH"
           make quartz64_defconfig
           make -j$(nproc)
           cp arch/arm64/boot/Image.gz ../firmware-quartz64a/boot/vmlinuz
@@ -79,16 +72,22 @@ jobs:
           rm firmware-quartz64a/lib/modules/*/build firmware-quartz64a/lib/modules/*/source
           cp -R firmware-quartz64a/lib/modules firmware-quartz64b/lib/
           cp -R firmware-quartz64a/lib/modules firmware-soquartz/lib/
-          rm -R "linux-$linux_version"
       - name: Build package
         run: |
+          rm -R "linux-$linux_version"
           curl -sSfO 'https://dietpi.com/downloads/binaries/firmware-quartz64a.deb' &
           curl -sSfo firmware-quartz64b/lib/firmware/brcm/brcmfmac43456-sdio.bin 'https://raw.githubusercontent.com/armbian/firmware/master/brcm/brcmfmac43456-sdio.bin' &
           curl -sSfo firmware-quartz64b/lib/firmware/brcm/brcmfmac43456-sdio.clm_blob 'https://raw.githubusercontent.com/armbian/firmware/master/brcm/brcmfmac43456-sdio.clm_blob' &
           curl -sSfo firmware-quartz64b/lib/firmware/brcm/brcmfmac43456-sdio.clm_blob 'https://raw.githubusercontent.com/armbian/firmware/master/brcm/brcmfmac43456-sdio.txt' &
           curl -sSfo firmware-quartz64a/lib/firmware/brcm/brcmfmac43455-sdio.txt 'https://git.kernel.org/pub/scm/linux/kernel/git/firmware/linux-firmware.git/plain/brcm/brcmfmac43455-sdio.AW-CM256SM.txt' &
           wait
-          version=$(dpkg-deb -f firmware-quartz64a.deb Version)
+          cur_version=$(dpkg-deb -f firmware-quartz64a.deb Version)
+          rm firmware-quartz64a.deb
+          cur_suffix=${cur_version#*-dietpi}
+          echo "Current package version is:  $cur_version"
+          echo "New kernel version is:       $version"
+          [ "$version-dietpi$cur_suffix" = "$cur_version" ] && version="$version-dietpi$((cur_suffix+1))" || version="$version-dietpi1"
+          echo "New package version will be: $version"
           rm firmware-quartz64a.deb
           suffix=${version#*-dietpi}
           if [ "$version" = "$linux_version-dietpi$suffix" ]
