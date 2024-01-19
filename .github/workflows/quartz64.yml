@@ -32,7 +32,7 @@ jobs:
         wait
         curl -sSfo "u-boot-$uboot_version/ddr.bin" 'https://raw.githubusercontent.com/JeffyCN/mirrors/ddf03c1/bin/rk35/rk3568_ddr_1560MHz_v1.13.bin' &
         curl -sSfo "u-boot-$uboot_version/bl31.elf" 'https://raw.githubusercontent.com/JeffyCN/mirrors/6186deb/bin/rk35/rk3568_bl31_v1.28.elf' &
-        curl -sSfo linux-rolling-stable/arch/arm64/configs/quartz64_defconfig "https://raw.githubusercontent.com/$GITHUB_REPOSITORY_OWNER/DietPi/$GITHUB_REF_NAME/.build/images/Quartz64/quartz64_defconfig" &
+        cp .build/images/Quartz64/quartz64_defconfig linux-rolling-stable/arch/arm64/configs/quartz64_defconfig
         rm -Rf firmware-quartz64a/DEBIAN firmware-quartz64a/boot/extlinux firmware-quartz64a/lib/firmware/brcm
         mkdir -p firmware-quartz64a/DEBIAN firmware-quartz64a/boot/extlinux firmware-quartz64a/lib/firmware/brcm
         rm -Rf firmware-quartz64b/DEBIAN firmware-quartz64b/boot/extlinux firmware-quartz64b/lib/firmware/brcm
