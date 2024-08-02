@@ -180,7 +180,6 @@ Available commands:
 
 	# PHP version
 	case $G_DISTRO in
-		5) PHP_VERSION='7.3';;
 		6) PHP_VERSION='7.4';;
 		*) PHP_VERSION='8.2';;
 	esac
@@ -807,7 +806,7 @@ Available commands:
 		aSOFTWARE_CATX[$software_id]=4
 		aSOFTWARE_DOCS[$software_id]='https://dietpi.com/docs/software/cloud/#gogs'
 		aSOFTWARE_DEPS[$software_id]='17 88 0'
-		aSOFTWARE_CONFLICTS[$software_id]='165'
+		aSOFTWARE_CONFLICTS[$software_id]='165 177'
 		#------------------
 		software_id=50
 		aSOFTWARE_NAME[$software_id]='Syncthing'
@@ -839,8 +838,18 @@ Available commands:
 		aSOFTWARE_CATX[$software_id]=4
 		aSOFTWARE_DOCS[$software_id]='https://dietpi.com/docs/software/cloud/#gitea'
 		aSOFTWARE_DEPS[$software_id]='17 88 0'
-		aSOFTWARE_CONFLICTS[$software_id]='49'
+		aSOFTWARE_CONFLICTS[$software_id]='49 177'
 		# - RISC-V: Missing binary: https://github.com/go-gitea/gitea/releases
+		aSOFTWARE_AVAIL_G_HW_ARCH[$software_id,11]=0
+		#------------------
+		software_id=177
+		aSOFTWARE_NAME[$software_id]='Forgejo'
+		aSOFTWARE_DESC[$software_id]='Self-hosted lightweight software forge. Fork of Gitea.'
+		aSOFTWARE_CATX[$software_id]=4
+		aSOFTWARE_DOCS[$software_id]='https://dietpi.com/docs/software/cloud/#forgejo'
+		aSOFTWARE_DEPS[$software_id]='17 88 0'
+		aSOFTWARE_CONFLICTS[$software_id]='49 165'
+		# - RISC-V: Missing binary: https://codeberg.org/forgejo/forgejo/releases
 		aSOFTWARE_AVAIL_G_HW_ARCH[$software_id,11]=0
 		#------------------
 		software_id=183
@@ -1038,6 +1047,13 @@ Available commands:
 		aSOFTWARE_CATX[$software_id]=6
 		aSOFTWARE_DOCS[$software_id]='https://dietpi.com/docs/software/social/#mediawiki'
 		aSOFTWARE_DEPS[$software_id]='88 89 webserver'
+		#------------------
+		software_id=213
+		aSOFTWARE_NAME[$software_id]='soju'
+		aSOFTWARE_DESC[$software_id]='A user-friendly IRC bouncer'
+		aSOFTWARE_CATX[$software_id]=6
+		aSOFTWARE_DOCS[$software_id]='https://dietpi.com/docs/software/social/#soju'
+		aSOFTWARE_DEPS[$software_id]='188'
 
 		# Camera & Surveillance
 		#--------------------------------------------------------------------------------
@@ -2654,8 +2670,11 @@ _EOF_
 
 		if To_Install 6 # X.Org X Server
 		then
-			# Generic X server + Mesa OpenGL libraries and utilities
+			# Generic X server and utilities
 			aDEPS=('xserver-xorg-core' 'xserver-xorg-input-libinput' 'xinit' 'dbus-user-session' 'xfonts-base' 'x11-xserver-utils' 'x11-utils')
+
+			# Pre-create config dir: https://dietpi.com/forum/t/19963
+			G_EXEC mkdir -p /etc/X11/xorg.conf.d
 
 			# RPi
 			if (( $G_HW_MODEL < 10 ))
@@ -2990,8 +3009,8 @@ unix_socket_directories = '/run/postgresql'" > "$i/00dietpi.conf"
 
 		if To_Install 9 # Node.js
 		then
-			# Deps: https://github.com/MichaIng/DietPi/issues/3614
-			aDEPS=('libatomic1')
+			# ARMv6/7/RISC-V deps (verified 2024-07-11): https://github.com/MichaIng/DietPi/issues/3614
+			(( $G_HW_ARCH < 3 || $G_HW_ARCH == 11 )) && aDEPS=('libatomic1')
 
 			# Download installer
 			Download_Install 'https://raw.githubusercontent.com/MichaIng/nodejs-linux-installer/master/node-install.sh'
@@ -3041,7 +3060,7 @@ unix_socket_directories = '/run/postgresql'" > "$i/00dietpi.conf"
 			# - On Raspbian use separate suite: https://github.com/MichaIng/DietPi/issues/1023
 			local suite='buster'
 			(( $G_RASPBIAN )) && suite='raspbianbuster'
-			G_EXEC eval "echo 'deb https://download.mono-project.com/repo/debian/ $suite main' > /etc/apt/sources.list.d/dietpi-mono.list"
+			G_EXEC eval "echo 'deb https://download.mono-project.com/repo/debian $suite main' > /etc/apt/sources.list.d/dietpi-mono.list"
 			G_AGUP
 
 			# APT package
@@ -3082,8 +3101,8 @@ unix_socket_directories = '/run/postgresql'" > "$i/00dietpi.conf"
 
 		if To_Install 170 # UnRAR
 		then
-			# On Raspbian and for RISC-V, only "unrar-free" is available which does not support all RAR formats, thus we use "unrar" [non-free] from Debian on ARMv7+ models: http://raspbian.raspberrypi.com/raspbian/pool/non-free/u/unrar-nonfree/, https://deb.debian.org/debian-ports/pool/non-free/u/unrar-nonfree/
-			if (( $G_HW_ARCH == 1 || $G_HW_ARCH == 11 ))
+			# On Raspbian, only "unrar-free" is available which does not support all RAR formats, thus we use "unrar" [non-free] from Debian on ARMv7+ models: http://raspbian.raspberrypi.com/raspbian/pool/non-free/u/unrar-nonfree/
+			if (( $G_HW_ARCH == 1 ))
 			then
 				G_AGI unrar-free
 
@@ -3273,27 +3292,21 @@ _EOF_
 			[[ $backend == 'Yes' ]] && backend='-backend' || backend=
 
 			# Download binary and set config URL
-			local url
-			if (( $G_HW_ARCH == 11 ))
-			then
-				url="https://dietpi.com/downloads/binaries/dietpi-dashboard-$G_HW_ARCH_NAME$backend.zip"
-
-			elif [[ $version == 'Stable' ]]
-			then
-				Download_Install "$(curl -sSfL 'https://api.github.com/repos/ravenclaw900/dietpi-dashboard/releases/latest' | mawk -F\" "/^ *\"browser_download_url\": \".*dietpi-dashboard-$G_HW_ARCH_NAME$backend\"$/{print \$4}")" /opt/dietpi-dashboard/dietpi-dashboard
-				url="https://raw.githubusercontent.com/ravenclaw900/DietPi-Dashboard/$(curl -sSfL 'https://api.github.com/repos/ravenclaw900/dietpi-dashboard/releases/latest' | mawk -F\" '/^ *"tag_name": "[^"]*",$/{print $4}')/config.toml"
-
-			elif [[ $version == 'Nightly' ]]
+			local config_url
+			if [[ $G_HW_ARCH == 11 || $version == 'Nightly' ]]
 			then
 				Download_Install "https://nightly.link/ravenclaw900/DietPi-Dashboard/workflows/push-build/main/dietpi-dashboard-$G_HW_ARCH_NAME$backend.zip" /opt/dietpi-dashboard
-				url='https://raw.githubusercontent.com/ravenclaw900/DietPi-Dashboard/main/config.toml'
+				config_url='https://raw.githubusercontent.com/ravenclaw900/DietPi-Dashboard/main/config.toml'
+			else
+				Download_Install "$(curl -sSfL 'https://api.github.com/repos/ravenclaw900/dietpi-dashboard/releases/latest' | mawk -F\" "/^ *\"browser_download_url\": \".*dietpi-dashboard-$G_HW_ARCH_NAME$backend\"$/{print \$4}")" /opt/dietpi-dashboard/dietpi-dashboard
+				config_url="https://raw.githubusercontent.com/ravenclaw900/DietPi-Dashboard/$(curl -sSfL 'https://api.github.com/repos/ravenclaw900/dietpi-dashboard/releases/latest' | mawk -F\" '/^ *"tag_name": "[^"]*",$/{print $4}')/config.toml"
 			fi
 			G_EXEC chmod +x /opt/dietpi-dashboard/dietpi-dashboard
 
 			# Config
 			if [[ ! -f '/opt/dietpi-dashboard/config.toml' ]]
 			then
-				G_EXEC curl -sSfL "$url" -o /opt/dietpi-dashboard/config.toml
+				G_EXEC curl -sSfL "$config_url" -o /opt/dietpi-dashboard/config.toml
 				# Enable password protection with global software password by default
 				G_CONFIG_INJECT 'pass[[:blank:]]' 'pass = true' /opt/dietpi-dashboard/config.toml
 				G_CONFIG_INJECT 'hash[[:blank:]]' "hash = \"$(echo -n "$GLOBAL_PW" | sha512sum | mawk '{print $1}')\"" /opt/dietpi-dashboard/config.toml
@@ -3332,7 +3345,7 @@ _EOF_
 			esac
 
 			# Download binary
-			local fallback_url="https://github.com/prometheus/node_exporter/releases/download/v1.7.0/node_exporter-1.7.0.linux-$arch.tar.gz"
+			local fallback_url="https://github.com/prometheus/node_exporter/releases/download/v1.8.2/node_exporter-1.8.2.linux-$arch.tar.gz"
 			Download_Install "$(curl -sSfL 'https://api.github.com/repos/prometheus/node_exporter/releases/latest' | mawk -F\" "/^ *\"browser_download_url\": \".*\/node_exporter-.*\.linux-$arch\.tar\.gz\"$/{print \$4}")"
 			G_EXEC mkdir -p /opt/node_exporter
 			G_EXEC cp --preserve=mode node_exporter*/node_exporter /opt/node_exporter/
@@ -3881,20 +3894,20 @@ _EOF_
 		then
 			# APT deps for Synapse with PostgreSQL
 			case $G_HW_ARCH in
-				[12]|11)
-					if (( $G_DISTRO < 7 ))
-					then
-						G_AGI libtiff5 libopenjp2-7 libxcb1 # ARMv6/7: Runtime libs for Pillow from piwheels (libtiff5 pulls libjpeg62-turbo)
-					else
-						# Bookworm: Most wheels need to be compiled: gcc and libffi-dev for cffi, Rust for cryptography and matrix-synapse, libpq-dev for psycopg2, make for PyNaCl, libjpeg62-turbo-dev for Pillow, libssl-dev and pkg-config for cryptography
-						G_AGI gcc libffi-dev libpq-dev make libjpeg62-turbo-dev libssl-dev pkg-config
-						G_EXEC curl -sSf 'https://sh.rustup.rs/' -o rustup-init.sh
-						G_EXEC chmod +x rustup-init.sh
-						# RPi with 64-bit kernel on 32-bit image: Enforce 32-bit toolchain: https://github.com/MichaIng/DietPi/issues/6306
-						G_EXEC_OUTPUT=1 G_EXEC ./rustup-init.sh -y --profile minimal ${RPI_64KERNEL_32OS:+'--default-host' 'armv7-unknown-linux-gnueabihf'}
-						G_EXEC rm rustup-init.sh
-						export PATH="/root/.cargo/bin:$PATH"
-					fi
+				1|2)
+					local libtiff='libtiff6'
+					(( $G_DISTRO < 7 )) && libtiff='libtiff5'
+					G_AGI "$libtiff" libopenjp2-7 libxcb1 # ARMv6/7: Runtime libs for Pillow from piwheels (libtiff pulls libjpeg62-turbo)
+				;;
+				11)
+					# gcc and libffi-dev for cffi, Rust for cryptography and matrix-synapse, libpq-dev for psycopg2, make for PyNaCl, libjpeg62-turbo-dev for Pillow, libssl-dev and pkg-config for cryptography
+					G_AGI gcc libffi-dev libpq-dev make libjpeg62-turbo-dev libssl-dev pkg-config
+					G_EXEC curl -sSf 'https://sh.rustup.rs/' -o rustup-init.sh
+					G_EXEC chmod +x rustup-init.sh
+					# RPi with 64-bit kernel on 32-bit image: Enforce 32-bit toolchain: https://github.com/MichaIng/DietPi/issues/6306
+					G_EXEC_OUTPUT=1 G_EXEC ./rustup-init.sh -y --profile minimal ${RPI_64KERNEL_32OS:+'--default-host' 'armv7-unknown-linux-gnueabihf'}
+					G_EXEC rm rustup-init.sh
+					export PATH="/root/.cargo/bin:$PATH"
 				;;
 				*) G_AGI gcc libpq-dev;; # ARMv8/x86_64: psycopg2 needs to be compiled
 			esac
@@ -3926,15 +3939,15 @@ _EOF_
 			# Database
 			G_EXEC systemctl start postgresql
 			local synapse_pass=$(tr -dc '[:alnum:]' < /dev/random | head -c30)
-			if [[ $(sudo -u postgres psql -tAc "SELECT 1 FROM pg_roles WHERE rolname='synapse'") != 1 ]]
+			if [[ $(runuser -u postgres -- psql -tAc "SELECT 1 FROM pg_roles WHERE rolname='synapse'") != 1 ]]
 			then
-				G_EXEC sudo -u postgres psql -c "CREATE ROLE synapse WITH LOGIN PASSWORD '$synapse_pass';"
+				G_EXEC runuser -u postgres -- psql -c "CREATE ROLE synapse WITH LOGIN PASSWORD '$synapse_pass';"
 			else
-				G_EXEC sudo -u postgres psql -c "ALTER ROLE synapse WITH PASSWORD '$synapse_pass';"
+				G_EXEC runuser -u postgres -- psql -c "ALTER ROLE synapse WITH PASSWORD '$synapse_pass';"
 			fi
-			if [[ $(sudo -u postgres psql -tAc "SELECT 1 FROM pg_database WHERE datname='synapse'") != 1 ]]
+			if [[ $(runuser -u postgres -- psql -tAc "SELECT 1 FROM pg_database WHERE datname='synapse'") != 1 ]]
 			then
-				G_EXEC sudo -u postgres createdb --encoding=UTF8 --locale=C --template=template0 --owner=synapse synapse
+				G_EXEC runuser -u postgres -- createdb --encoding=UTF8 --locale=C --template=template0 --owner=synapse synapse
 			fi
 
 			# Pre-create drop-in config for database access details
@@ -4024,8 +4037,9 @@ User=mpd
 RuntimeDirectory=mpd
 EnvironmentFile=
 ExecStart=
-ExecStart=/usr/bin/mpd --no-daemon
+ExecStart=/usr/bin/mpd --systemd
 _EOF_
+			(( $G_DISTRO < 7 )) && G_EXEC sed -i 's/systemd/no-daemon/' /etc/systemd/system/mpd.service.d/dietpi.conf
 			Remove_SysV mpd 1
 
 			# Config
@@ -4140,8 +4154,8 @@ _EOF_
 			esac
 
 			# Download latest version
-			local version=$(curl -sSfL 'https://dist.ipfs.io/go-ipfs/versions' | tail -1)
-			[[ $version ]] || { version='v0.20.0'; G_DIETPI-NOTIFY 1 "Automatic latest ${aSOFTWARE_NAME[$software_id]} version detection failed. Version \"$version\" will be installed as fallback, but a newer version might be available. Please report this at: https://github.com/MichaIng/DietPi/issues"; }
+			local version=$(curl -sSfL 'https://dist.ipfs.io/go-ipfs/versions' | sed '/-rc[0-9]*$/d' | tail -1)
+			[[ $version ]] || { version='v0.27.0'; G_DIETPI-NOTIFY 1 "Automatic latest ${aSOFTWARE_NAME[$software_id]} version detection failed. Version \"$version\" will be installed as fallback, but a newer version might be available. Please report this at: https://github.com/MichaIng/DietPi/issues"; }
 			Download_Install "https://dist.ipfs.io/go-ipfs/$version/go-ipfs_${version}_linux-$arch.tar.gz"
 
 			# Install
@@ -4192,7 +4206,7 @@ _EOF_
 		if To_Install 16 # microblog.pub
 		then
 			local micro_name='microblog-pub'
-			local micro_python_version='3.11.4' # https://github.com/pyenv/pyenv/tree/master/plugins/python-build/share/python-build
+			local micro_python_version='3.11.9' # https://github.com/pyenv/pyenv/tree/master/plugins/python-build/share/python-build
 			local micro_pyenv_dir="/opt/$micro_name"
 			local micro_pyenv_activate_file="$micro_pyenv_dir/pyenv-activate.sh"
 			local micro_virtualenv="$micro_pyenv_dir/.virtual_path"
@@ -4229,7 +4243,7 @@ _EOF_
 				G_EXEC curl -sSf 'https://sh.rustup.rs/' -o rustup-init.sh
 				G_EXEC chmod +x rustup-init.sh
 				# RPi with 64-bit kernel on 32-bit image: Enforce 32-bit toolchain: https://github.com/MichaIng/DietPi/issues/6306
-				G_EXEC_OUTPUT=1 G_EXEC sudo -u "$micro_name" ./rustup-init.sh -y --profile minimal ${RPI_64KERNEL_32OS:+'--default-host' 'armv7-unknown-linux-gnueabihf'}
+				G_EXEC_OUTPUT=1 G_EXEC runuser -u "$micro_name" -- ./rustup-init.sh -y --profile minimal ${RPI_64KERNEL_32OS:+'--default-host' 'armv7-unknown-linux-gnueabihf'}
 				G_EXEC rm rustup-init.sh
 			fi
 
@@ -4254,7 +4268,7 @@ PS1=\"(microblog.pub) \$PS1\"" > "$micro_pyenv_activate_file"
 			# Install Python 3.10 and Poetry
 			G_EXEC chown -R "$micro_name:$micro_name" "$micro_pyenv_dir"
 			G_EXEC_DESC='Installing Python with Poetry into pyenv'
-			G_EXEC_OUTPUT=1 G_EXEC sudo -u "$micro_name" dash -c "
+			G_EXEC_OUTPUT=1 G_EXEC runuser -u "$micro_name" -- dash -c "
 . $micro_pyenv_activate_file || exit 1
 pyenv install $micro_python_version || exit 1
 pyenv local $micro_python_version || exit 1
@@ -4447,7 +4461,7 @@ location = /.well-known/caldav  { return 301 /owncloud/remote.php/dav/; }' > /et
 			G_EXEC systemctl restart redis-server
 
 			# Initially add occ command shortcut, will be added as alias by /etc/bashrc.d/dietpi.bash if occ file exist:
-			occ(){ sudo -u www-data php /var/www/owncloud/occ "$@"; }
+			occ(){ runuser -u www-data -- php /var/www/owncloud/occ "$@"; }
 
 			# Adjusting config file:
 			local config_php='/var/www/owncloud/config/config.php'
@@ -4678,7 +4692,7 @@ location = /.well-known/caldav  { return 301 /nextcloud/remote.php/dav/; }' > /e
 			G_EXEC systemctl restart redis-server
 
 			# Initially add occ command shortcut, will be added as alias by /etc/bashrc.d/dietpi.bash if occ file exist:
-			ncc(){ sudo -u www-data php /var/www/nextcloud/occ "$@"; }
+			ncc(){ runuser -u www-data -- php /var/www/nextcloud/occ "$@"; }
 
 			# Adjusting config file:
 			local config_php='/var/www/nextcloud/config/config.php'
@@ -4895,7 +4909,8 @@ The install script will now exit. After applying one of the the above, rerun die
 
 		if To_Install 32 ympd # ympd
 		then
-			Download_Install "https://dietpi.com/downloads/binaries/$G_DISTRO_NAME/ympd_$G_HW_ARCH_NAME.deb"
+			G_AGI ympd
+			G_EXEC systemctl stop ympd
 		fi
 
 		if To_Install 148 mympd # myMPD
@@ -4905,7 +4920,6 @@ The install script will now exit. After applying one of the the above, rerun die
 			(( $G_RASPBIAN )) && distro='Raspbian_'
 
 			case $G_DISTRO in
-				5) distro+='10';;
 				6) distro+='11';;
 				7) distro+='12';;
 				*) distro+='Testing';;
@@ -5039,7 +5053,7 @@ _EOF_
 				G_EXEC eval "curl -sSfL '$url' | gpg --dearmor -o /etc/apt/trusted.gpg.d/dietpi-mopidy.gpg --yes"
 
 				# APT list
-				G_EXEC eval "echo 'deb https://apt.mopidy.com/ ${G_DISTRO_NAME/bookworm/bullseye} main contrib non-free' > /etc/apt/sources.list.d/mopidy.list"
+				G_EXEC eval "echo 'deb https://apt.mopidy.com ${G_DISTRO_NAME/bookworm/bullseye} main contrib non-free' > /etc/apt/sources.list.d/mopidy.list"
 				G_AGUP
 			fi
 
@@ -5287,7 +5301,7 @@ _EOF_
 			local arch=$(dpkg --print-architecture)
 			local version=$(curl -sSfL 'https://hndl.urbackup.org/Server/' | grep -Pwo '(?<=href=")[0-9.]+(?=/")' | sort -Vr | head -1)
 			local file=$(curl -sSfL "https://hndl.urbackup.org/Server/$version/" | grep -Pwom1 "(?<=href=\")urbackup-server_${version}_$arch\.deb(?=\")")
-			local fallback_url="https://hndl.urbackup.org/Server/2.5.31/urbackup-server_2.5.31_$arch.deb"
+			local fallback_url="https://hndl.urbackup.org/Server/2.5.33/urbackup-server_2.5.33_$arch.deb"
 			Download_Install "${file:+https://hndl.urbackup.org/Server/$version/$file}"
 			G_EXEC systemctl stop urbackupsrv
 			unset -v backuppath arch version file
@@ -6205,7 +6219,7 @@ _EOF_
 				*) local arch='amd64';;
 			esac
 
-			local fallback_url="https://github.com/navidrome/navidrome/releases/download/v0.51.1/navidrome_0.51.1_linux_$arch.tar.gz"
+			local fallback_url="https://github.com/navidrome/navidrome/releases/download/v0.52.5/navidrome_0.52.5_linux_$arch.tar.gz"
 			Download_Install "$(curl -sSfL 'https://api.github.com/repos/navidrome/navidrome/releases/latest' | mawk -F\" "/^ *\"browser_download_url\": \".*\/navidrome_[0-9.]*_linux_$arch\.tar\.gz\"$/{print \$4}")" /opt/navidrome
 
 			# Data dir
@@ -6288,9 +6302,8 @@ _EOF_
 
 		if To_Install 212 kavita # Kavita
 		then
-			# .NET dependency: https://github.com/dotnet/core/blob/main/Documentation/linux-prereqs.md
+			# .NET dependency: https://github.com/dotnet/docs/blob/main/docs/core/install/linux-debian.md#dependencies
 			case $G_DISTRO in
-				5) aDEPS=('libicu63');;
 				6) aDEPS=('libicu67');;
 				*) aDEPS=('libicu72');;
 			esac
@@ -6301,7 +6314,7 @@ _EOF_
 				*) local arch='x64';;
 			esac
 
-			local fallback_url="https://github.com/Kareadita/Kavita/releases/download/v0.7.14/kavita-linux-$arch.tar.gz"
+			local fallback_url="https://github.com/Kareadita/Kavita/releases/download/v0.8.2/kavita-linux-$arch.tar.gz"
 			Download_Install "$(curl -sSfL 'https://api.github.com/repos/Kareadita/Kavita/releases/latest' | mawk -F\" "/^ *\"browser_download_url\": \".*\/kavita-linux-$arch\.tar\.gz\"$/{print \$4}")"
 			G_EXEC chmod +x Kavita/Kavita
 
@@ -6367,7 +6380,7 @@ _EOF_
 			G_WHIP_MSG "[ INFO ] The installation of Remote.It is complete.
 \nThe final step is to register your claim code with your desktop application.
 See the manual below for instructions on how to do this.
-\nhttps://docs.remote.it/software/device-package/installation#3.-claim-and-register-the-device
+\nhttps://docs.remote.it/software/device-package/installation#id-3.-claim-and-register-the-device
 \nYour claim code: $(mawk -F\" '/claim/{print $4}' /etc/remoteit/config.json)
 \nThen this DietPi device will be online as your Remote.It device and you can start using it."
 
@@ -6505,11 +6518,11 @@ _EOF_
 				3) local arch='arm64';;
 				10) local arch='amd64';;
 				11) local arch='riscv64';;
-				*) local arch='arm';;
+				*) local arch='arm_hf';;
 			esac
 
 			# Download
-			local fallback_url="https://github.com/fatedier/frp/releases/download/v0.56.0/frp_0.56.0_linux_$arch.tar.gz"
+			local fallback_url="https://github.com/fatedier/frp/releases/download/v0.59.0/frp_0.59.0_linux_$arch.tar.gz"
 			Download_Install "$(curl -sSfL 'https://api.github.com/repos/fatedier/frp/releases/latest' | mawk -F\" "/\"browser_download_url\": .*\/frp_[0-9.]*_linux_$arch\.tar\.gz\"/{print \$4}")"
 
 			G_EXEC cd frp_*
@@ -6662,7 +6675,12 @@ _EOF_
 
 			# Install as local instance for "nodered" user
 			G_EXEC cd /mnt/dietpi_userdata/node-red
-			G_EXEC_OUTPUT=1 G_EXEC sudo -u nodered npm i --no-audit node-red
+			# - Disable cache
+			local cache=$(runuser -u nodered -- mktemp -d)
+			# - Reinstall: Remove all locally installed modules, to work around update issues, but preserve installed plugins from package.json: https://github.com/MichaIng/DietPi/issues/7128
+			[[ -f 'package.json' ]] && G_EXEC rm -Rf node_modules .npm/_cacache
+			G_EXEC_OUTPUT=1 G_EXEC runuser -u nodered -- npm i --cache "$cache" --no-audit node-red@latest
+			G_EXEC rm -R "$cache"
 			G_EXEC cd "$G_WORKING_DIR"
 
 			# Service
@@ -6690,12 +6708,12 @@ _EOF_
 			if (( $G_DISTRO < 8 )) && [[ $G_HW_ARCH == 2 || $G_HW_ARCH == 10 || ( $G_HW_ARCH == 3 && $G_DISTRO == 7 ) ]]
 			then
 				# APT key
-				local url='https://repo.mosquitto.org/debian/mosquitto-repo.gpg.key'
+				local url='https://repo.mosquitto.org/debian/mosquitto-repo.gpg'
 				G_CHECK_URL "$url"
 				G_EXEC eval "curl -sSfL '$url' | gpg --dearmor -o /etc/apt/trusted.gpg.d/dietpi-mosquitto.gpg --yes"
 
 				# APT list
-				G_EXEC eval "echo 'deb https://repo.mosquitto.org/debian/ $G_DISTRO_NAME main' > /etc/apt/sources.list.d/dietpi-mosquitto.list"
+				G_EXEC eval "echo 'deb https://repo.mosquitto.org/debian $G_DISTRO_NAME main' > /etc/apt/sources.list.d/dietpi-mosquitto.list"
 				G_AGUP
 			fi
 
@@ -6763,10 +6781,10 @@ _EOF_
 			fi
 
 			# RPi: Install "onoff" for GPIO access
-			(( $G_HW_MODEL > 9 )) || G_EXEC_OUTPUT=1 G_EXEC npm i -g --no-audit onoff
+			(( $G_HW_MODEL > 9 )) || G_EXEC_OUTPUT=1 G_EXEC npm i -g --no-audit onoff@latest
 
 			# Install Blynk JS library
-			G_EXEC_OUTPUT=1 G_EXEC npm i -g --no-audit blynk-library
+			G_EXEC_OUTPUT=1 G_EXEC npm i -g --no-audit blynk-library@latest
 
 			# Preserve existing config
 			if [[ ! -f '/mnt/dietpi_userdata/blynk/server.properties' ]]
@@ -6896,7 +6914,7 @@ _EOF_
 
 		if To_Install 98 haproxy # HAProxy
 		then
-			local version='2.8.3' # https://www.haproxy.org/download/
+			local version='3.0.2' # https://www.haproxy.org/download/
 			aDEPS=('make' 'gcc' 'libpcre3-dev' 'libssl-dev' 'zlib1g-dev' 'libsystemd-dev')
 			Download_Install "https://www.haproxy.org/download/${version%.*}/src/haproxy-$version.tar.gz"
 
@@ -7039,7 +7057,7 @@ _EOF_
 				aDEPS=()
 			else
 				local version=$(curl -sSfL 'https://api.github.com/repos/FreshRSS/FreshRSS/releases/latest' | mawk -F\" '/^ *"tag_name": "[^"]*",$/{print $4}')
-				[[ $version ]] || { version='1.23.1'; G_DIETPI-NOTIFY 1 "Automatic latest FreshRSS version detection failed. Version \"$version\" will be installed as fallback, but a newer version might be available. Please report this at: https://github.com/MichaIng/DietPi/issues"; }
+				[[ $version ]] || { version='1.24.1'; G_DIETPI-NOTIFY 1 "Automatic latest FreshRSS version detection failed. Version \"$version\" will be installed as fallback, but a newer version might be available. Please report this at: https://github.com/MichaIng/DietPi/issues"; }
 				Download_Install "https://github.com/FreshRSS/FreshRSS/archive/$version.tar.gz"
 				G_EXEC mv "FreshRSS-$version" /opt/FreshRSS
 			fi
@@ -7086,12 +7104,12 @@ _EOF_
 
 			# CLI install: https://github.com/FreshRSS/FreshRSS/blob/master/cli/README.md#commands
 			G_EXEC cd /opt/FreshRSS
-			sudo -u www-data php ./cli/prepare.php
-			sudo -u www-data php ./cli/do-install.php --default_user dietpi --auth_type form --environment production --title FreshRSS --db-type mysql --db-host localhost --db-user freshrss --db-password "$password" --db-base freshrss --db-prefix freshrss
+			runuser -u www-data -- php ./cli/prepare.php
+			runuser -u www-data -- php ./cli/do-install.php --default_user dietpi --auth_type form --environment production --title FreshRSS --db-type mysql --db-host localhost --db-user freshrss --db-password "$password" --db-base freshrss --db-prefix freshrss
 			unset -v password
-			sudo -u www-data php ./cli/create-user.php --user dietpi --password "$GLOBAL_PW" --api_password "$GLOBAL_PW"
-			sudo -u www-data php ./cli/actualize-user.php --user dietpi
-			sudo -u www-data php ./cli/db-optimize.php --user dietpi
+			runuser -u www-data -- php ./cli/create-user.php --user dietpi --password "$GLOBAL_PW" --api_password "$GLOBAL_PW"
+			runuser -u www-data -- php ./cli/actualize-user.php --user dietpi
+			runuser -u www-data -- php ./cli/db-optimize.php --user dietpi
 			G_EXEC cd "$G_WORKING_DIR"
 
 			# Link web interface to webroot
@@ -7277,6 +7295,27 @@ _EOF_
 			# Log to systemd by default
 			G_EXEC eval 'echo -e '\''[Definition]\nlogtarget = SYSOUT'\'' > /etc/fail2ban/fail2ban.d/97_dietpi.conf'
 
+			# Fix Dropbear filter for STDOUT logging since Bookworm: https://github.com/fail2ban/fail2ban/pull/3597
+			[[ -f '/etc/fail2ban/filter.d/dropbear.local' ]] || cat << '_EOF_' > /etc/fail2ban/filter.d/dropbear.local
+[INCLUDES]
+before = common.conf
+
+[Definition]
+
+_daemon = dropbear
+
+# Fix filter for STDOUT logging since Bookworm: https://github.com/fail2ban/fail2ban/pull/3597
+prefregex = ^%(__prefix_line)s(\[\d+\] [A-Z][a-z]+ \d\d \d\d:\d\d:\d\d )?<F-CONTENT>(?:[Ll]ogin|[Bb]ad|[Ee]xit).+</F-CONTENT>$
+
+failregex = ^[Ll]ogin attempt for nonexistent user ('.*' )?from <HOST>:\d+$
+            ^[Bb]ad (PAM )?password attempt for .+ from <HOST>(:\d+)?$
+            ^[Ee]xit before auth \(user '.+', \d+ fails\): Max auth tries reached - user '.+' from <HOST>:\d+\s*$
+
+ignoreregex =
+
+# Add journalmatch to enhance performance since Bookworm
+journalmatch = _SYSTEMD_UNIT=dropbear.service + _COMM=dropbear
+_EOF_
 			G_AGI python3-systemd fail2ban
 			Remove_SysV fail2ban 1
 
@@ -7293,7 +7332,7 @@ _EOF_
 			G_EXEC eval "curl -sSfL '$url' | gpg --dearmor -o /etc/apt/trusted.gpg.d/dietpi-influxdb.gpg --yes"
 
 			# APT list
-			G_EXEC eval "echo 'deb https://repos.influxdata.com/debian/ ${G_DISTRO_NAME/bookworm/bullseye} stable' > /etc/apt/sources.list.d/influxdb.list"
+			G_EXEC eval "echo 'deb https://repos.influxdata.com/debian ${G_DISTRO_NAME/bookworm/bullseye} stable' > /etc/apt/sources.list.d/influxdb.list"
 			G_AGUP
 
 			# APT package
@@ -7331,7 +7370,7 @@ _EOF_
 				G_EXEC eval "curl -sSfL '$url' | gpg --dearmor -o /etc/apt/trusted.gpg.d/dietpi-grafana.gpg --yes"
 
 				# APT list
-				G_EXEC eval "echo 'deb https://apt.grafana.com/ stable main' > /etc/apt/sources.list.d/grafana.list"
+				G_EXEC eval "echo 'deb https://apt.grafana.com stable main' > /etc/apt/sources.list.d/grafana.list"
 				G_AGUP
 
 				# APT package
@@ -7433,7 +7472,7 @@ _EOF_
 			then
 				Download_Install 'https://github.com/gotson/komga/releases/download/v0.165.0/komga-0.165.0.jar' /mnt/dietpi_userdata/komga/komga.jar
 			else
-				local fallback_url='https://github.com/gotson/komga/releases/download/1.10.4/komga-1.10.4.jar'
+				local fallback_url='https://github.com/gotson/komga/releases/download/1.11.2/komga-1.11.2.jar'
 				Download_Install "$(curl -sSfL 'https://api.github.com/repos/gotson/komga/releases/latest' | mawk -F\" '/^ *"browser_download_url": ".*\/komga-[^"\/]*\.jar"$/{print $4}')" /mnt/dietpi_userdata/komga/komga.jar
 			fi
 
@@ -7529,7 +7568,7 @@ _EOF_
 			local json=()
 			[[ $PHP_VERSION == 8* ]] || aDEPS+=("php$PHP_VERSION-json") json=('json')
 
-			local fallback_url="https://github.com/ampache/ampache/releases/download/6.3.1/ampache-6.3.1_all_php$PHP_VERSION.zip"
+			local fallback_url="https://github.com/ampache/ampache/releases/download/6.6.0/ampache-6.6.0_all_php$PHP_VERSION.zip"
 			Download_Install "$(curl -sSfL 'https://api.github.com/repos/ampache/ampache/releases/latest' | mawk -F\" "/^ *\"browser_download_url\": \".*\/ampache-[0-9\.]*_all_php$PHP_VERSION.zip\"$/{print \$4}")" ampache
 
 			# Reinstall: Preserve configs from old and new paths
@@ -7791,7 +7830,7 @@ _EOF_
 			G_EXEC eval "curl -sSfL '$url' | gpg --dearmor -o /etc/apt/trusted.gpg.d/dietpi-zerotier.gpg --yes"
 
 			# APT list
-			G_EXEC eval "echo 'deb https://download.zerotier.com/debian/${G_DISTRO_NAME/trixie/bookworm}/ ${G_DISTRO_NAME/trixie/bookworm} main' > /etc/apt/sources.list.d/dietpi-zerotier.list"
+			G_EXEC eval "echo 'deb https://download.zerotier.com/debian/${G_DISTRO_NAME/trixie/bookworm} ${G_DISTRO_NAME/trixie/bookworm} main' > /etc/apt/sources.list.d/dietpi-zerotier.list"
 			G_AGUP
 
 			# APT package
@@ -7867,7 +7906,7 @@ netmask 255.255.255.0
 #gateway 192.168.0.1
 #dns-nameservers 9.9.9.9 149.112.112.112
 pre-up iw dev $wifi_iface set power_save off
-post-down iw dev "$wifi_iface set power_save on
+post-down iw dev $wifi_iface set power_save on
 
 # iptables NAT rules
 up iptables-restore < /etc/iptables.ipv4.nat
@@ -7914,7 +7953,7 @@ _EOF_
 			cat << _EOF_ > /etc/hostapd/hostapd.conf
 interface=$wifi_iface
 driver=nl80211
-ssid=${ssid:-DietPi-HotSpot}
+ssid=${ssid:-DietPi-Hotspot}
 country_code=00
 hw_mode=$mode
 channel=$channel
@@ -8033,7 +8072,7 @@ _EOF_
 				airplay2=
 			fi
 
-			Download_Install "https://dietpi.com/downloads/binaries/$G_DISTRO_NAME/shairport-sync${airplay2}_$G_HW_ARCH_NAME.deb"
+			G_AGI "shairport-sync$airplay2"
 			G_EXEC systemctl stop shairport-sync
 		fi
 
@@ -8119,7 +8158,7 @@ _EOF_
 
 		if To_Install 36 squeezelite # Squeezelite
 		then
-			Download_Install "https://dietpi.com/downloads/binaries/$G_DISTRO_NAME/squeezelite_$G_HW_ARCH_NAME.deb"
+			G_AGI squeezelite
 			G_EXEC systemctl stop squeezelite
 		fi
 
@@ -8285,7 +8324,7 @@ location = /.well-known/caldav  { return 301 /baikal/html/dav.php; }' > /etc/ngi
 			G_EXEC eval "curl -sSfL '$url' | gpg --dearmor -o /etc/apt/trusted.gpg.d/dietpi-plexmediaserver.gpg --yes"
 
 			# APT list
-			G_EXEC eval 'echo '\''deb https://downloads.plex.tv/repo/deb/ public main'\'' > /etc/apt/sources.list.d/plexmediaserver.list'
+			G_EXEC eval 'echo '\''deb https://downloads.plex.tv/repo/deb public main'\'' > /etc/apt/sources.list.d/plexmediaserver.list'
 			G_AGUP
 
 			# APT package
@@ -8377,7 +8416,7 @@ _EOF_
 			G_EXEC chmod +x mineos_console.js webui.js update_webui.sh reset_webui.sh generate-sslcert.sh
 
 			# Workaround: Node.js posix needs to be installed alone first: https://github.com/MichaIng/DietPi/issues/5181
-			G_EXEC_OUTPUT=1 G_EXEC npm i --no-audit --no-package-lock posix
+			G_EXEC_OUTPUT=1 G_EXEC npm i --no-audit --no-package-lock posix@latest
 
 			# Install MineOS
 			G_EXEC_OUTPUT=1 G_EXEC npm i --no-audit
@@ -8495,7 +8534,7 @@ _EOF_
 			fi
 
 			# Service
-			cat << _EOF_ > /etc/systemd/system/qbittorrent.service
+			cat << '_EOF_' > /etc/systemd/system/qbittorrent.service
 [Unit]
 Description=qBittorrent (DietPi)
 Documentation=man:qbittorrent-nox(1)
@@ -8506,7 +8545,7 @@ After=network-online.target remote-fs.target
 User=qbittorrent
 UMask=002
 LogsDirectory=qbittorrent
-ExecStart=$(command -v qbittorrent-nox)
+ExecStart=/usr/bin/qbittorrent-nox
 
 [Install]
 WantedBy=multi-user.target
@@ -8522,7 +8561,7 @@ _EOF_
 			# Install ruTorrent: Web UI for rTorrent
 			# - Grab current version
 			local version=$(curl -sSfL 'https://api.github.com/repos/Novik/ruTorrent/releases/latest' | mawk -F\" '/^ *"tag_name": "[^"]*",$/{print $4}')
-			[[ $version ]] || { version='v4.2.11'; G_DIETPI-NOTIFY 1 "Automatic latest ruTorrent version detection failed. Version \"$version\" will be installed as fallback, but a newer version might be available. Please report this at: https://github.com/MichaIng/DietPi/issues"; }
+			[[ $version ]] || { version='v4.3.6'; G_DIETPI-NOTIFY 1 "Automatic latest ruTorrent version detection failed. Version \"$version\" will be installed as fallback, but a newer version might be available. Please report this at: https://github.com/MichaIng/DietPi/issues"; }
 			Download_Install "https://github.com/Novik/ruTorrent/archive/$version.tar.gz"
 
 			# - Reinstall freshly with preserved configs and 3rd party plugins
@@ -8913,7 +8952,7 @@ _EOF_
 					*) local arch='arm';;
 				esac
 
-				local fallback_url="https://github.com/syncthing/syncthing/releases/download/v1.27.5/syncthing-linux-$arch-v1.27.5.tar.gz"
+				local fallback_url="https://github.com/syncthing/syncthing/releases/download/v1.27.9/syncthing-linux-$arch-v1.27.9.tar.gz"
 				Download_Install "$(curl -sSfL 'https://api.github.com/repos/syncthing/syncthing/releases/latest' | mawk -F\" "/\"browser_download_url\": .*\/syncthing-linux-$arch-[^\"\/]*\.tar\.gz\"/{print \$4}")"
 				G_EXEC mv syncthing-* /opt/syncthing
 			fi
@@ -8928,7 +8967,7 @@ _EOF_
 				G_EXEC chown dietpi /mnt/dietpi_userdata
 
 				# Run Syncthing to pre-create config dir and exit
-				G_EXEC_OUTPUT=1 G_EXEC sudo -u dietpi /opt/syncthing/syncthing -generate=/mnt/dietpi_userdata/syncthing
+				G_EXEC_OUTPUT=1 G_EXEC runuser -u dietpi -- /opt/syncthing/syncthing -generate=/mnt/dietpi_userdata/syncthing
 
 				# Allow remote access: https://docs.syncthing.net/users/faq.html#how-do-i-access-the-web-gui-from-another-computer
 				G_EXEC sed --follow-symlinks -i '\|:8384</address>|c\        <address>0.0.0.0:8384</address>' /mnt/dietpi_userdata/syncthing/config.xml
@@ -9121,9 +9160,9 @@ _EOF_
 			if [[ ${aSOFTWARE_INSTALL_STATE[153]} == 2 && -f '/mnt/dietpi_userdata/octoprint/.octoprint/config.yaml' ]]
 			then
 				G_DIETPI-NOTIFY 2 'Configuring OctoPrint to use mjpg-streamer for webcam support'
-				G_EXEC sudo -u octoprint /mnt/dietpi_userdata/octoprint/.local/bin/octoprint config set webcam.stream "http://$(G_GET_NET ip):8082/?action=stream"
-				G_EXEC sudo -u octoprint /mnt/dietpi_userdata/octoprint/.local/bin/octoprint config set webcam.snapshot 'http://127.0.0.1:8082/?action=snapshot'
-				G_EXEC sudo -u octoprint /mnt/dietpi_userdata/octoprint/.local/bin/octoprint config set webcam.ffmpeg "$(command -v ffmpeg)"
+				G_EXEC runuser -u octoprint -- /mnt/dietpi_userdata/octoprint/.local/bin/octoprint config set webcam.stream "http://$(G_GET_NET ip):8082/?action=stream"
+				G_EXEC runuser -u octoprint -- /mnt/dietpi_userdata/octoprint/.local/bin/octoprint config set webcam.snapshot 'http://127.0.0.1:8082/?action=snapshot'
+				G_EXEC runuser -u octoprint -- /mnt/dietpi_userdata/octoprint/.local/bin/octoprint config set webcam.ffmpeg "$(command -v ffmpeg)"
 			fi
 		fi
 
@@ -9260,9 +9299,7 @@ _EOF_
 
 		if To_Install 183 vaultwarden # vaultwarden
 		then
-			[[ -f '/opt/vaultwarden/target/release/vaultwarden' ]] && G_EXEC rm -R /opt/vaultwarden # Pre-v8.7
-			[[ -f '/etc/systemd/system/vaultwarden.service' ]] && G_EXEC rm /etc/systemd/system/vaultwarden.service # Pre-v8.7
-			Download_Install "https://dietpi.com/downloads/binaries/$G_DISTRO_NAME/vaultwarden_$G_HW_ARCH_NAME.deb"
+			G_AGI vaultwarden
 			G_EXEC systemctl stop vaultwarden
 		fi
 
@@ -9318,7 +9355,7 @@ _EOF_
 
 		if To_Install 143 koel # Koel
 		then
-			# APT dependencies: https://docs.koel.dev/#server > https://laravel.com/docs/9.x/deployment#server-requirements / https://laravel.com/docs/8.x/deployment#server-requirements
+			# APT dependencies: https://docs.koel.dev/guide/getting-started > https://laravel.com/docs/10.x/deployment#server-requirements / https://laravel.com/docs/8.x/deployment#server-requirements
 			# - Skip JSON module from PHP 8.0 on, where it is embedded into core
 			# - pdo_sqlite module required for "artisan koel:init" < "artisan db:seed", despite MySQL database engine used
 			aDEPS=("php$PHP_VERSION-bcmath" "php$PHP_VERSION-mbstring" "php$PHP_VERSION-sqlite3" "php$PHP_VERSION-xml")
@@ -9327,7 +9364,7 @@ _EOF_
 			if (( ${PHP_VERSION::1} > 7 ))
 			then
 				aDEPS+=("php$PHP_VERSION-curl")
-				local fallback_url='https://github.com/koel/koel/releases/download/v6.12.1/koel-v6.12.1.tar.gz' aphp_deps=('curl' 'dom')
+				local fallback_url='https://github.com/koel/koel/releases/download/v7.0.9/koel-v7.0.9.tar.gz' aphp_deps=('curl' 'dom')
 				Download_Install "$(curl -sSfL 'https://api.github.com/repos/koel/koel/releases/latest' | mawk -F\" '/^ *"browser_download_url": ".*\/koel-[^"\/]*\.tar\.gz"$/{print $4}')"
 			else
 				aDEPS+=("php$PHP_VERSION-json")
@@ -9378,8 +9415,8 @@ _EOF_
 			Download_Test_Media
 
 			# Init
-			G_EXEC_OUTPUT=1 G_EXEC sudo -u koel "php$PHP_VERSION" artisan koel:init -n --no-assets
-			G_EXEC_OUTPUT=1 G_EXEC sudo -u koel "php$PHP_VERSION" artisan koel:sync
+			G_EXEC_OUTPUT=1 G_EXEC runuser -u koel -- "php$PHP_VERSION" artisan koel:init -n --no-assets
+			G_EXEC_OUTPUT=1 G_EXEC runuser -u koel -- "php$PHP_VERSION" artisan koel:sync
 			G_EXEC cd "$G_WORKING_DIR"
 
 			# Service: Run on port 8003 by default to avoid conflict with Icecast
@@ -9408,7 +9445,7 @@ _EOF_
 			G_EXEC eval 'curl -sSf '\''https://keyserver.ubuntu.com/pks/lookup?search=0x2009837CBFFD68F45BC180471F4F90DE2A9B4BF8&op=get'\'' | gpg --dearmor -o /etc/apt/trusted.gpg.d/dietpi-sonarr.gpg --yes'
 
 			# APT list: Buster is the latest available suite: https://apt.sonarr.tv/debian/dists/
-			G_EXEC eval 'echo '\''deb https://apt.sonarr.tv/debian/ buster main'\'' > /etc/apt/sources.list.d/sonarr.list'
+			G_EXEC eval 'echo '\''deb https://apt.sonarr.tv/debian buster main'\'' > /etc/apt/sources.list.d/sonarr.list'
 
 			# Update package lists
 			G_AGUP
@@ -9479,11 +9516,10 @@ _EOF_
 		then
 			# APT dependencies
 			aDEPS=('mediainfo')
-			# - .NET: https://github.com/dotnet/core/blob/main/Documentation/linux-prereqs.md
+			# - .NET: https://github.com/dotnet/docs/blob/main/docs/core/install/linux-debian.md#dependencies
 			if (( $G_HW_ARCH != 1 ))
 			then
 				case $G_DISTRO in
-					5) aDEPS+=('libicu63');;
 					6) aDEPS+=('libicu67');;
 					*) aDEPS+=('libicu72');;
 				esac
@@ -9510,7 +9546,7 @@ _EOF_
 					esac
 
 					url=$(curl -sSfL 'https://api.github.com/repos/Radarr/Radarr/releases/latest' | mawk -F\" "/^ *\"browser_download_url\": \".*linux-core-$arch\.tar\.gz\"$/{print \$4}")
-					local fallback_url="https://github.com/Radarr/Radarr/releases/download/v5.3.6.8612/Radarr.master.5.3.6.8612.linux-core-$arch.tar.gz"
+					local fallback_url="https://github.com/Radarr/Radarr/releases/download/v5.8.3.8933/Radarr.master.5.8.3.8933.linux-core-$arch.tar.gz"
 				fi
 
 				Download_Install "$url"
@@ -9573,11 +9609,10 @@ _EOF_
 		then
 			# APT dependencies
 			aDEPS=('mediainfo')
-			# - .NET: https://github.com/dotnet/core/blob/main/Documentation/linux-prereqs.md
+			# - .NET: https://github.com/dotnet/docs/blob/main/docs/core/install/linux-debian.md#dependencies
 			if (( $G_HW_ARCH != 1 ))
 			then
 				case $G_DISTRO in
-					5) aDEPS+=('libicu63');;
 					6) aDEPS+=('libicu67');;
 					*) aDEPS+=('libicu72');;
 				esac
@@ -9607,7 +9642,7 @@ _EOF_
 					esac
 
 					url=$(curl -sSfL 'https://api.github.com/repos/Lidarr/Lidarr/releases/latest' | mawk -F\" "/^ *\"browser_download_url\": \".*linux-core-$arch\.tar\.gz\"$/{print \$4}")
-					local fallback_url="https://github.com/Lidarr/Lidarr/releases/download/v2.1.7.4030/Lidarr.master.2.1.7.4030.linux-core-$arch.tar.gz"
+					local fallback_url="https://github.com/Lidarr/Lidarr/releases/download/v2.4.3.4248/Lidarr.master.2.4.3.4248.linux-core-$arch.tar.gz"
 				fi
 
 				Download_Install "$url"
@@ -9665,10 +9700,10 @@ _EOF_
 		if To_Install 180 bazarr # Bazarr: https://wiki.bazarr.media/Getting-Started/Installation/Linux/linux/
 		then
 			# APT deps
+			aDEPS=('unzip')
 			if (( $G_HW_ARCH < 3 ))
 			then
-				aDEPS=('g++' 'libopenblas-dev' 'pkg-config') # g++, libopenblas-dev and pkg-config for numpy until wheels have been built on piwheels. Afterwards install libopenblas0 runtime library instead: https://piwheels.org/project/numpy/
-				(( $G_DISTRO < 7 )) || aDEPS+=('libxslt1-dev') # Bookworm: libxslt1-dev and gcc for lxml until wheels have been built on piwheels: https://piwheels.org/project/lxml/
+				aDEPS+=('libopenblas0-pthread') # libopenblas0-pthread runtime library for piwheels wheel: https://piwheels.org/project/numpy/
 				(( $G_HW_ARCH == 1 )) && aDEPS+=('unar') # ARMv6 does not support unrar-nonfree and Bazarr does not support unrar-free, so we need to use "unar": https://github.com/morpheus65535/bazarr/issues/2172
 			fi
 
@@ -9708,6 +9743,7 @@ User=bazarr
 UMask=002
 LogsDirectory=bazarr
 ExecStart=/usr/bin/python3 /opt/bazarr/bazarr.py -c /mnt/dietpi_userdata/bazarr
+KillSignal=SIGINT
 
 # Hardening
 ProtectSystem=strict
@@ -9796,11 +9832,10 @@ _EOF_
 		if To_Install 147 jackett # Jackett
 		then
 			# ARMv6 requires Mono: https://github.com/Jackett/Jackett#installation-on-linux-armv6-or-below
-			# .NET dependency: https://github.com/dotnet/core/blob/main/Documentation/linux-prereqs.md
+			# .NET dependency: https://github.com/dotnet/docs/blob/main/docs/core/install/linux-debian.md#dependencies
 			if (( $G_HW_ARCH != 1 ))
 			then
 				case $G_DISTRO in
-					5) aDEPS=('libicu63');;
 					6) aDEPS=('libicu67');;
 					*) aDEPS=('libicu72');;
 				esac
@@ -9874,7 +9909,7 @@ _EOF_
 			local reinstall=0
 			[[ -f '/mnt/dietpi_userdata/nzbget/nzbget.conf' ]] && reinstall=1
 
-			local fallback_url='https://github.com/nzbgetcom/nzbget/releases/download/v22.0/nzbget-22.0-bin-linux.run'
+			local fallback_url='https://github.com/nzbgetcom/nzbget/releases/download/v24.1/nzbget-24.1-bin-linux.run'
 			Download_Install "$(curl -sSfL 'https://api.github.com/repos/nzbgetcom/nzbget/releases/latest' | mawk -F\" '/^ *"browser_download_url": ".*\/nzbget-[^"/]*-bin-linux.run"$/{print $4}')" nzbget.run
 			G_EXEC mkdir -p /mnt/dietpi_userdata/nzbget
 			G_EXEC_OUTPUT=1 G_EXEC dash nzbget.run --destdir /mnt/dietpi_userdata/nzbget
@@ -9931,9 +9966,8 @@ _EOF_
 
 		if To_Install 151 prowlarr # Prowlarr
 		then
-			# .NET dependency: https://github.com/dotnet/core/blob/main/Documentation/linux-prereqs.md
+			# .NET dependency: https://github.com/dotnet/docs/blob/main/docs/core/install/linux-debian.md#dependencies
 			case $G_DISTRO in
-				5) aDEPS=('libicu63');;
 				6) aDEPS=('libicu67');;
 				*) aDEPS=('libicu72');;
 			esac
@@ -9954,7 +9988,7 @@ _EOF_
 					*) local arch='x64';;
 				esac
 
-				local fallback_url="https://github.com/Prowlarr/Prowlarr/releases/download/v1.15.0.4361/Prowlarr.master.1.15.0.4361.linux-core-$arch.tar.gz"
+				local fallback_url="https://github.com/Prowlarr/Prowlarr/releases/download/v1.21.2.4649/Prowlarr.master.1.21.2.4649.linux-core-$arch.tar.gz"
 				Download_Install "$(curl -sSfL 'https://api.github.com/repos/Prowlarr/Prowlarr/releases/latest' | mawk -F\" "/^ *\"browser_download_url\": \".*linux-core-$arch\.tar\.gz\"$/{print \$4}")"
 				G_EXEC mv Prowlarr /opt/prowlarr
 			fi
@@ -10006,9 +10040,8 @@ _EOF_
 
 		if To_Install 203 readarr # Readarr
 		then
-			# .NET dependency: https://github.com/dotnet/core/blob/main/Documentation/linux-prereqs.md
+			# .NET dependency: https://github.com/dotnet/docs/blob/main/docs/core/install/linux-debian.md#dependencies
 			case $G_DISTRO in
-				5) aDEPS=('libicu63');;
 				6) aDEPS=('libicu67');;
 				*) aDEPS=('libicu72');;
 			esac
@@ -10029,7 +10062,7 @@ _EOF_
 					*) local arch='x64';;
 				esac
 
-				local fallback_url="https://github.com/Readarr/Readarr/releases/download/v0.3.22.2499/Readarr.develop.0.3.22.2499.linux-core-$arch.tar.gz"
+				local fallback_url="https://github.com/Readarr/Readarr/releases/download/v0.3.32.2587/Readarr.develop.0.3.32.2587.linux-core-$arch.tar.gz"
 				Download_Install "$(curl -sSfL 'https://api.github.com/repos/Readarr/Readarr/releases' | mawk -F\" "/^ *\"browser_download_url\": \".*linux-core-$arch\.tar\.gz\"$/{print \$4}" | head -1)"
 				G_EXEC mv Readarr /opt/readarr
 			fi
@@ -10086,22 +10119,22 @@ _EOF_
 
 			# APT deps
 			case $G_HW_ARCH in
-				[12]|11)
-					if (( $G_DISTRO < 7 ))
-					then
-						G_AGI libtiff5 libopenjp2-7 libxcb1 # ARMv6/7: Runtime libs for Pillow from piwheels (libtiff5 pulls libjpeg62-turbo)
-					else
-						# Bookworm: Most wheels need to be compiled: gcc and libffi-dev for cffi, libssl-dev and Rust for cryptography and bcrypt, make for PyNaCl, libjpeg62-turbo-dev for Pillow, pkg-config for cryptography
-						G_AGI gcc libffi-dev libssl-dev make libjpeg62-turbo-dev pkg-config
-						G_EXEC curl -sSf 'https://sh.rustup.rs/' -o rustup-init.sh
-						G_EXEC chmod +x rustup-init.sh
-						# RPi with 64-bit kernel on 32-bit image: Enforce 32-bit toolchain: https://github.com/MichaIng/DietPi/issues/6306
-						G_EXEC_OUTPUT=1 G_EXEC ./rustup-init.sh -y --profile minimal ${RPI_64KERNEL_32OS:+'--default-host' 'armv7-unknown-linux-gnueabihf'}
-						G_EXEC rm rustup-init.sh
-						export PATH="/root/.cargo/bin:$PATH"
-					fi
+				1|2)
+					local libtiff='libtiff6'
+					(( $G_DISTRO < 7 )) && libtiff='libtiff5'
+					G_AGI "$libtiff" libopenjp2-7 libxcb1 # ARMv6/7: Runtime libs for Pillow from piwheels (libtiff pulls libjpeg62-turbo)
 				;;
 				3) G_AGI gcc;; # gcc for psutil
+				11)
+					# gcc and libffi-dev for cffi, libssl-dev and Rust for cryptography and bcrypt, make for PyNaCl, libjpeg62-turbo-dev for Pillow, pkg-config for cryptography
+					G_AGI gcc libffi-dev libssl-dev make libjpeg62-turbo-dev pkg-config
+					G_EXEC curl -sSf 'https://sh.rustup.rs/' -o rustup-init.sh
+					G_EXEC chmod +x rustup-init.sh
+					# RPi with 64-bit kernel on 32-bit image: Enforce 32-bit toolchain: https://github.com/MichaIng/DietPi/issues/6306
+					G_EXEC_OUTPUT=1 G_EXEC ./rustup-init.sh -y --profile minimal ${RPI_64KERNEL_32OS:+'--default-host' 'armv7-unknown-linux-gnueabihf'}
+					G_EXEC rm rustup-init.sh
+					export PATH="/root/.cargo/bin:$PATH"
+				;;
 				*) :;;
 			esac
 
@@ -10143,29 +10176,34 @@ _EOF_
 
 		if To_Install 153 octoprint # OctoPrint
 		then
-			# Deps
-			# - RISC-V and ARMv6/7 Bookworm: gcc and libffi-dev for cffi
-			if (( $G_HW_ARCH == 11 || ( $G_HW_ARCH < 3 && $G_DISTRO > 6 ) ))
-			then
-				G_AGI gcc libffi-dev
-
-			# - ARMv8:: gcc for netifaces and psutil
-			# - Bookworm: gcc for netifaces
-			elif (( $G_HW_ARCH == 3 || $G_DISTRO > 6 ))
-			then
-				G_AGI gcc
-			fi
-
-			# Pre-create user and its home directory to allow user-level Python instance
+			# Pre-create user and its home directory to allow user-level (Rust and) Python instance
 			Create_User -G dialout,tty,video -d /mnt/dietpi_userdata/octoprint octoprint
 			G_EXEC mkdir -p /mnt/dietpi_userdata/octoprint
 			G_EXEC chown -R octoprint:octoprint /mnt/dietpi_userdata/octoprint
+
+			# Deps
+			# - RISC-V: gcc and libffi-dev for cffi, Rust for maturin
+			local aPATH=()
+			if (( $G_HW_ARCH == 11 ))
+			then
+				aDEPS=('gcc' 'libffi-dev')
+				G_EXEC curl -sSf 'https://sh.rustup.rs/' -o rustup-init.sh
+				G_EXEC chmod +x rustup-init.sh
+				G_EXEC_OUTPUT=1 G_EXEC runuser -u octoprint -- ./rustup-init.sh -y --profile minimal
+				G_EXEC rm rustup-init.sh
+				aPATH=("PATH='/mnt/dietpi_userdata/octoprint/.cargo/bin:$PATH'")
+
+			# - ARMv8: gcc for psutil
+			elif (( $G_HW_ARCH == 3 ))
+			then
+				G_AGI gcc
+			fi
 
 			# Clear pip cache in case it got somehow created
 			[[ -d '/mnt/dietpi_userdata/octoprint/.cache' ]] && G_EXEC rm -R /mnt/dietpi_userdata/octoprint/.cache
 
 			# Install OctoPrint
-			G_EXEC_OUTPUT=1 G_EXEC sudo -u octoprint pip3 install -U --user --no-warn-script-location octoprint
+			G_EXEC_OUTPUT=1 G_EXEC runuser -u octoprint -- "${aPATH[@]}" pip3 install -U --user --no-warn-script-location octoprint
 
 			# Service: https://github.com/OctoPrint/OctoPrint/blob/master/scripts/octoprint.service
 			cat << '_EOF_' > /etc/systemd/system/octoprint.service
@@ -10187,22 +10225,22 @@ _EOF_
 			echo "alias octoprint='sudo -u octoprint /mnt/dietpi_userdata/octoprint/.local/bin/octoprint'" > /etc/bashrc.d/dietpi-octoprint.sh
 
 			# On fresh installs, change listening port to 5001 to avoid conflict with Shairport Sync.
-			[[ -f '/mnt/dietpi_userdata/octoprint/.octoprint/config.yaml' ]] || G_EXEC sudo -u octoprint /mnt/dietpi_userdata/octoprint/.local/bin/octoprint config set server.port '5001'
+			[[ -f '/mnt/dietpi_userdata/octoprint/.octoprint/config.yaml' ]] || G_EXEC runuser -u octoprint -- /mnt/dietpi_userdata/octoprint/.local/bin/octoprint config set server.port '5001'
 
 			# Apply service and system commands: Allow execution via specific sudoers config, use "which" for "reboot" and "poweroff", since we create shell functions in dietpi-globals to bypass logind calls, if logind is not running.
 			# shellcheck disable=SC2230
 			echo "octoprint ALL=NOPASSWD: $(command -v systemctl) restart octoprint, $(which reboot), $(which poweroff)" > /etc/sudoers.d/octoprint
-			G_EXEC sudo -u octoprint /mnt/dietpi_userdata/octoprint/.local/bin/octoprint config set server.commands.serverRestartCommand 'sudo systemctl restart octoprint'
-			G_EXEC sudo -u octoprint /mnt/dietpi_userdata/octoprint/.local/bin/octoprint config set server.commands.systemRestartCommand 'sudo reboot'
-			G_EXEC sudo -u octoprint /mnt/dietpi_userdata/octoprint/.local/bin/octoprint config set server.commands.systemShutdownCommand 'sudo poweroff'
+			G_EXEC runuser -u octoprint -- /mnt/dietpi_userdata/octoprint/.local/bin/octoprint config set server.commands.serverRestartCommand 'sudo systemctl restart octoprint'
+			G_EXEC runuser -u octoprint -- /mnt/dietpi_userdata/octoprint/.local/bin/octoprint config set server.commands.systemRestartCommand 'sudo reboot'
+			G_EXEC runuser -u octoprint -- /mnt/dietpi_userdata/octoprint/.local/bin/octoprint config set server.commands.systemShutdownCommand 'sudo poweroff'
 
 			# mjpg-streamer: Configure OctoPrint to use it, if installed
 			if (( ${aSOFTWARE_INSTALL_STATE[137]} > 0 ))
 			then
 				G_DIETPI-NOTIFY 2 'Configuring OctoPrint to use mjpg-streamer for webcam support'
-				G_EXEC sudo -u octoprint /mnt/dietpi_userdata/octoprint/.local/bin/octoprint config set webcam.stream "http://$(G_GET_NET ip):8082/?action=stream"
-				G_EXEC sudo -u octoprint /mnt/dietpi_userdata/octoprint/.local/bin/octoprint config set webcam.snapshot 'http://127.0.0.1:8082/?action=snapshot'
-				G_EXEC sudo -u octoprint /mnt/dietpi_userdata/octoprint/.local/bin/octoprint config set webcam.ffmpeg "$(command -v ffmpeg)"
+				G_EXEC runuser -u octoprint -- /mnt/dietpi_userdata/octoprint/.local/bin/octoprint config set webcam.stream "http://$(G_GET_NET ip):8082/?action=stream"
+				G_EXEC runuser -u octoprint -- /mnt/dietpi_userdata/octoprint/.local/bin/octoprint config set webcam.snapshot 'http://127.0.0.1:8082/?action=snapshot'
+				G_EXEC runuser -u octoprint -- /mnt/dietpi_userdata/octoprint/.local/bin/octoprint config set webcam.ffmpeg "$(command -v ffmpeg)"
 			fi
 		fi
 
@@ -10220,9 +10258,8 @@ _EOF_
 		if To_Install 154 roonserver # Roon Server
 		then
 			# https://help.roonlabs.com/portal/en/kb/articles/linux-install#Manual_Install
-			# .NET dependency: https://github.com/dotnet/core/blob/main/Documentation/linux-prereqs.md
+			# .NET dependency: https://github.com/dotnet/docs/blob/main/docs/core/install/linux-debian.md#dependencies
 			case $G_DISTRO in
-				5) aDEPS=('libicu63');;
 				6) aDEPS=('libicu67');;
 				*) aDEPS=('libicu72');;
 			esac
@@ -10372,7 +10409,7 @@ _EOF_
 				G_EXEC eval "curl -sSfL '$url' | gpg --dearmor -o /etc/apt/trusted.gpg.d/dietpi-docker.gpg --yes"
 
 				# APT list
-				G_EXEC eval "echo 'deb https://download.docker.com/linux/$distro/ ${G_DISTRO_NAME/trixie/bookworm} stable' > /etc/apt/sources.list.d/docker.list"
+				G_EXEC eval "echo 'deb https://download.docker.com/linux/$distro ${G_DISTRO_NAME/trixie/bookworm} stable' > /etc/apt/sources.list.d/docker.list"
 				G_AGUP
 
 				# APT package name
@@ -10593,7 +10630,7 @@ _EOF_
 				*) local arch='arm-6';;
 			esac
 
-			local fallback_url="https://github.com/go-gitea/gitea/releases/download/v1.21.10/gitea-1.21.10-linux-$arch.xz"
+			local fallback_url="https://github.com/go-gitea/gitea/releases/download/v1.22.1/gitea-1.22.1-linux-$arch.xz"
 			Download_Install "$(curl -sSfL 'https://api.github.com/repos/go-gitea/gitea/releases/latest' | mawk -F\" "/\"browser_download_url\": \".*\/gitea-[^\"\/]*-linux-$arch\.xz\"/{print \$4}")" /mnt/dietpi_userdata/gitea/gitea
 
 			# User
@@ -10632,16 +10669,55 @@ _EOF_
 			[[ -f '/mnt/dietpi_userdata/gitea/custom/conf/app.ini' ]] && G_CONFIG_INJECT 'RUN_USER[[:blank:]]' 'RUN_USER = gitea' /mnt/dietpi_userdata/gitea/custom/conf/app.ini
 		fi
 
+		if To_Install 177 forgejo # Forgejo
+		then
+			# ARMv7: Dedicated binaries are not provided: https://codeberg.org/forgejo/forgejo/releases
+			case $G_HW_ARCH in
+				3) local arch='arm64';;
+				10) local arch='amd64';;
+				*) local arch='arm-6';;
+			esac
+
+			local fallback_url="https://codeberg.org/forgejo/forgejo/releases/download/v7.0.3/forgejo-7.0.3-linux-$arch.xz"
+			Download_Install "$(curl -sSfL 'https://codeberg.org/api/v1/repos/forgejo/forgejo/releases/latest' | mawk -v RS=, -F\" "/^\"browser_download_url\":\".*-linux-$arch\.xz\"/{print \$4;exit}")" /mnt/dietpi_userdata/forgejo/forgejo
+
+			# User
+			Create_User -d /mnt/dietpi_userdata/forgejo -s /bin/dash forgejo
+
+			# Permissions
+			G_EXEC chown -R forgejo:forgejo /mnt/dietpi_userdata/forgejo
+			G_EXEC chmod +x /mnt/dietpi_userdata/forgejo/forgejo
+
+			# Database
+			/boot/dietpi/func/create_mysql_db forgejo forgejo "$GLOBAL_PW"
+
+			# Service
+			cat << '_EOF_' > /etc/systemd/system/forgejo.service
+[Unit]
+Description=Forgejo (DietPi)
+Wants=network-online.target
+After=network-online.target mariadb.service
+
+[Service]
+User=forgejo
+LogsDirectory=forgejo
+WorkingDirectory=/mnt/dietpi_userdata/forgejo
+ExecStart=/mnt/dietpi_userdata/forgejo/forgejo web
+
+# Hardening
+ProtectSystem=full
+PrivateDevices=yes
+PrivateTmp=yes
+NoNewPrivileges=true
+
+[Install]
+WantedBy=multi-user.target
+_EOF_
+		fi
+
 		if To_Install 163 gmediarender # GMediaRender
 		then
-			# Pre-v8.10
-			[[ -f '/etc/systemd/system/gmediarender.service' ]] && G_EXEC rm /etc/systemd/system/gmediarender.service
-			[[ -d '/etc/systemd/system/gmediarender.service.d' ]] && grep -Rq '/usr/local/bin/gmediarender' /etc/systemd/system/gmediarender.service.d && G_EXEC rm -R /etc/systemd/system/gmediarender.service.d
-			getent passwd gmrender > /dev/null && G_EXEC userdel gmrender
-			getent group gmrender > /dev/null && G_EXEC groupdel gmrender
-			[[ -f '/usr/local/bin/gmediarender' ]] && G_EXEC rm /usr/local/bin/gmediarender
-			[[ -d '/usr/local/share/gmediarender' ]] && G_EXEC rm -R /usr/local/share/gmediarender
-			Download_Install "https://dietpi.com/downloads/binaries/$G_DISTRO_NAME/gmediarender_$G_HW_ARCH_NAME.deb"
+			G_AGI gmediarender
 			G_EXEC systemctl stop gmediarender
 		fi
 
@@ -10766,7 +10842,7 @@ _EOF_
 				G_EXEC eval "curl -sSfL '$url' | gpg --dearmor -o /etc/apt/trusted.gpg.d/dietpi-raspotify.gpg --yes"
 
 				# APT list
-				G_EXEC eval 'echo '\''deb https://dtcooper.github.io/raspotify/ raspotify main'\'' > /etc/apt/sources.list.d/raspotify.list'
+				G_EXEC eval 'echo '\''deb https://dtcooper.github.io/raspotify raspotify main'\'' > /etc/apt/sources.list.d/raspotify.list'
 				G_AGUP
 
 				# APT package
@@ -10851,7 +10927,7 @@ _EOF_
 			# -sm: Skip mimic build which is time intense and can be manually done any time later.
 			# - Remove PulseAudio from dependencies, we use ALSA
 			G_EXEC sed --follow-symlinks -Ei 's/[^[:blank:]"'\'']*pulseaudio[^[:blank:]"'\'']*//g' ./dev_setup.sh
-			G_EXEC_OUTPUT=1 G_EXEC sudo -u mycroft ./dev_setup.sh -sm
+			G_EXEC_OUTPUT=1 G_EXEC runuser -u mycroft -- ./dev_setup.sh -sm
 			G_EXEC cd "$G_WORKING_DIR"
 
 			# Service
@@ -10927,17 +11003,12 @@ _EOF_
 			G_EXEC eval "curl -sSfL '$url' | gpg --dearmor -o /etc/apt/trusted.gpg.d/dietpi-jellyfin.gpg --yes"
 
 			# APT list
-			G_EXEC eval "echo 'deb https://repo.jellyfin.org/debian/ $G_DISTRO_NAME main' > /etc/apt/sources.list.d/dietpi-jellyfin.list"
+			G_EXEC eval "echo 'deb https://repo.jellyfin.org/debian $G_DISTRO_NAME main' > /etc/apt/sources.list.d/dietpi-jellyfin.list"
 			G_AGUP
 
 			# APT meta package: Server, web component and FFmpeg implementation
 			G_AGI jellyfin
-			if [[ -d '/mnt/dietpi_userdata/jellyfin' || -f '/etc/jellyfin/network.xml' ]]
-			then
-				G_EXEC systemctl stop jellyfin
-			else
-				CREATE_CONFIG_CONTENT='AddPeopleQueryIndex' Create_Config '/etc/jellyfin/migrations.xml' jellyfin 60
-			fi
+			G_EXEC systemctl stop jellyfin
 
 			# Grant dietpi group permissions and assure video access
 			Create_User -G dietpi,video,render -d /mnt/dietpi_userdata/jellyfin jellyfin
@@ -10945,8 +11016,6 @@ _EOF_
 			# Config: Only apply on fresh install, assumed when /mnt/dietpi_userdata/jellyfin does not yet exist
 			if [[ ! -d '/mnt/dietpi_userdata/jellyfin' ]]
 			then
-				# Start service until /etc/jellyfin/network.xml exists
-				Create_Config '/etc/jellyfin/network.xml' jellyfin
 				# Data dir
 				# shellcheck disable=SC2015
 				[[ -d '/var/lib/jellyfin' ]] && G_EXEC mv /var/lib/jellyfin /mnt/dietpi_userdata/jellyfin || G_EXEC mkdir /mnt/dietpi_userdata/jellyfin
@@ -10959,8 +11028,14 @@ _EOF_
 				[[ -d '/var/cache/jellyfin' ]] && G_EXEC mv /var/cache/jellyfin /mnt/dietpi_userdata/jellyfin/cache || G_EXEC mkdir /mnt/dietpi_userdata/jellyfin/cache
 				G_CONFIG_INJECT 'JELLYFIN_CACHE_DIR=' 'JELLYFIN_CACHE_DIR=/mnt/dietpi_userdata/jellyfin/cache' /etc/default/jellyfin
 				# Change default port due to conflict with Emby
-				G_CONFIG_INJECT '<PublicPort>' '<PublicPort>8097</PublicPort>' /etc/jellyfin/network.xml
-				G_CONFIG_INJECT '<HttpServerPortNumber>' '  <HttpServerPortNumber>8097</HttpServerPortNumber>' /etc/jellyfin/network.xml
+				# - This config file is not generated at service start, but only when saving network settings via web UI. This also complements any existing config with defaults, hence we pre-create one with only the changes we need.
+				cat << '_EOF_' > /etc/jellyfin/network.xml
+<NetworkConfiguration>
+  <InternalHttpPort>8097</InternalHttpPort>
+  <PublicHttpPort>8097</PublicHttpPort>
+</NetworkConfiguration>
+_EOF_
+				G_EXEC chown jellyfin: /etc/jellyfin/network.xml
 			fi
 
 			# Permissions
@@ -10976,7 +11051,7 @@ _EOF_
 
 			# Download
 			local version=$(curl -sSfL 'https://api.github.com/repos/ptitSeb/box86/releases/latest' | mawk -F\" '/^ *"tag_name": "[^"]*",$/{print $4}')
-			[[ $version ]] || { version='v0.3.4'; G_DIETPI-NOTIFY 1 "Automatic latest ${aSOFTWARE_NAME[$software_id]} version detection failed. Version \"$version\" will be installed as fallback, but a newer version might be available. Please report this at: https://github.com/MichaIng/DietPi/issues"; }
+			[[ $version ]] || { version='v0.3.6'; G_DIETPI-NOTIFY 1 "Automatic latest ${aSOFTWARE_NAME[$software_id]} version detection failed. Version \"$version\" will be installed as fallback, but a newer version might be available. Please report this at: https://github.com/MichaIng/DietPi/issues"; }
 			Download_Install "https://github.com/ptitSeb/box86/archive/$version.tar.gz"
 
 			# Build for targets: https://github.com/ptitSeb/box86/blob/master/CMakeLists.txt
@@ -10985,30 +11060,34 @@ _EOF_
 			# - RPi 2
 			if (( $G_HW_MODEL == 2 ))
 			then
-				G_EXEC cmake .. -DRPI2=1 -DNOGIT=1 -DCMAKE_BUILD_TYPE=RelWithDebInfo
+				G_EXEC cmake .. -DNOGIT=1 -DCMAKE_BUILD_TYPE=Release -DRPI2=1
 			# - RPi 3
 			elif (( $G_HW_MODEL == 3 ))
 			then
-				G_EXEC cmake .. -DRPI3=1 -DNOGIT=1 -DCMAKE_BUILD_TYPE=RelWithDebInfo
+				G_EXEC cmake .. -DNOGIT=1 -DCMAKE_BUILD_TYPE=Release -DRPI3=1
 			# - RPi 4
 			elif (( $G_HW_MODEL == 4 ))
 			then
-				G_EXEC cmake .. -DRPI4=1 -DNOGIT=1 -DCMAKE_BUILD_TYPE=RelWithDebInfo
+				G_EXEC cmake .. -DNOGIT=1 -DCMAKE_BUILD_TYPE=Release -DRPI4=1
 			# - Odroids
 			elif (( $G_HW_MODEL < 20 ))
 			then
-				G_EXEC cmake .. -DODROID=1 -DNOGIT=1 -DCMAKE_BUILD_TYPE=RelWithDebInfo
+				G_EXEC cmake .. -DNOGIT=1 -DCMAKE_BUILD_TYPE=Release -DODROID=1
 			# - ASUS Tinker Board
 			elif (( $G_HW_MODEL == 52 ))
 			then
-				G_EXEC cmake .. -DRK3288=1 -DNOGIT=1 -DCMAKE_BUILD_TYPE=RelWithDebInfo
+				G_EXEC cmake .. -DNOGIT=1 -DCMAKE_BUILD_TYPE=Release -DRK3288=1
 			# - Others
 			else
-				G_EXEC cmake .. -DARM_DYNAREC=1 -DNOGIT=1 -DCMAKE_BUILD_TYPE=RelWithDebInfo
+				G_EXEC cmake .. -DNOGIT=1 -DCMAKE_BUILD_TYPE=Release -DARM_DYNAREC=1
 			fi
 			G_EXEC_OUTPUT=1 G_EXEC make CFLAGS='-g0 -O3' "-j$(nproc)"
 			G_EXEC strip --remove-section=.comment --remove-section=.note box86
 			G_EXEC make install
+
+			# Cleanup
+			G_EXEC cd "$G_WORKING_DIR"
+			G_EXEC rm -R "box86-${version#v}"
 
 			# Reload binfmt if kernel module is available to have i386 binaries executed via box86 automatically from now on
 			modprobe binfmt_misc 2> /dev/null && G_EXEC systemctl restart systemd-binfmt
@@ -11021,7 +11100,7 @@ _EOF_
 
 			# Download
 			local version=$(curl -sSfL 'https://api.github.com/repos/ptitSeb/box64/releases/latest' | mawk -F\" '/^ *"tag_name": "[^"]*",$/{print $4}')
-			[[ $version ]] || { version='v0.2.6'; G_DIETPI-NOTIFY 1 "Automatic latest ${aSOFTWARE_NAME[$software_id]} version detection failed. Version \"$version\" will be installed as fallback, but a newer version might be available. Please report this at: https://github.com/MichaIng/DietPi/issues"; }
+			[[ $version ]] || { version='v0.3.0'; G_DIETPI-NOTIFY 1 "Automatic latest ${aSOFTWARE_NAME[$software_id]} version detection failed. Version \"$version\" will be installed as fallback, but a newer version might be available. Please report this at: https://github.com/MichaIng/DietPi/issues"; }
 			Download_Install "https://github.com/ptitSeb/box64/archive/$version.tar.gz"
 
 			# Build for targets: https://github.com/ptitSeb/box64/blob/main/CMakeLists.txt
@@ -11030,40 +11109,42 @@ _EOF_
 			# - RISC-V
 			if (( $G_HW_ARCH == 11 ))
 			then
-				G_EXEC cmake .. -DRV64=1 -DNOGIT=1 -DCMAKE_BUILD_TYPE=RelWithDebInfo
-			# - RPi 3
-			elif (( $G_HW_MODEL == 3 ))
+				G_EXEC cmake .. -DNOGIT=1 -DCMAKE_BUILD_TYPE=Release -DRV64=1
+			# - RPi 2/3
+			elif (( $G_HW_MODEL == 2 || $G_HW_MODEL == 3 ))
 			then
-				G_EXEC cmake .. -DRPI3ARM64=1 -DNOGIT=1 -DCMAKE_BUILD_TYPE=RelWithDebInfo
+				G_EXEC cmake .. -DNOGIT=1 -DCMAKE_BUILD_TYPE=Release -DRPI3ARM64=1
 			# - RPi 4
 			elif (( $G_HW_MODEL == 4 ))
 			then
-				G_EXEC cmake .. -DRPI4ARM64=1 -DNOGIT=1 -DCMAKE_BUILD_TYPE=RelWithDebInfo
+				G_EXEC cmake .. -DNOGIT=1 -DCMAKE_BUILD_TYPE=Release -DRPI4ARM64=1
 			# - RPi 5
 			elif (( $G_HW_MODEL == 5 ))
 			then
-				local ps16k=''
-				dpkg-query -s 'linux-image-rpi-2712' &> /dev/null && ps16k='PS16K'
-				G_EXEC cmake .. "-DRPI5ARM64$ps16k=1" -DNOGIT=1 -DCMAKE_BUILD_TYPE=RelWithDebInfo
+				G_EXEC cmake .. -DNOGIT=1 -DCMAKE_BUILD_TYPE=Release -DRPI5ARM64=1
 			# - Odroid N2
 			elif (( $G_HW_MODEL == 15 ))
 			then
-				G_EXEC cmake .. -DODROIDN2=1 -DNOGIT=1 -DCMAKE_BUILD_TYPE=RelWithDebInfo
+				G_EXEC cmake .. -DNOGIT=1 -DCMAKE_BUILD_TYPE=Release -DODROIDN2=1
 			# - RK3399
 			elif (( $G_HW_CPUID == 3 ))
 			then
-				G_EXEC cmake .. -DRK3399=1 -DNOGIT=1 -DCMAKE_BUILD_TYPE=RelWithDebInfo
+				G_EXEC cmake .. -DNOGIT=1 -DCMAKE_BUILD_TYPE=Release -DRK3399=1
 			# - RK3588
 			elif (( $G_HW_CPUID == 11 ))
 			then
-				G_EXEC cmake .. -DRK3588=1 -DNOGIT=1 -DCMAKE_BUILD_TYPE=RelWithDebInfo
+				G_EXEC cmake .. -DNOGIT=1 -DCMAKE_BUILD_TYPE=Release -DRK3588=1
 			# - Generic ARMv8
 			else
-				G_EXEC cmake .. -DARM64=1 -DNOGIT=1 -DCMAKE_BUILD_TYPE=RelWithDebInfo
+				G_EXEC cmake .. -DNOGIT=1 -DCMAKE_BUILD_TYPE=Release -DARM64=1
 			fi
 			G_EXEC_OUTPUT=1 G_EXEC make CFLAGS='-g0 -O3' "-j$(nproc)"
 			G_EXEC strip --remove-section=.comment --remove-section=.note box64
 			G_EXEC make install
+
+			# Cleanup
+			G_EXEC cd "$G_WORKING_DIR"
+			G_EXEC rm -R "box64-${version#v}"
 
 			# Reload binfmt if kernel module is available to have x86_64 binaries executed via box64 automatically from now on
 			modprobe binfmt_misc 2> /dev/null && G_EXEC systemctl restart systemd-binfmt
@@ -11077,7 +11158,7 @@ _EOF_
 			G_EXEC eval "curl -sSfL '$url' | gpg --dearmor -o /etc/apt/trusted.gpg.d/dietpi-moonlight.gpg --yes"
 
 			# APT list
-			G_EXEC eval "echo 'deb https://dl.cloudsmith.io/public/moonlight-game-streaming/moonlight-embedded/deb/raspbian/ ${G_DISTRO_NAME/trixie/bookworm} main' > /etc/apt/sources.list.d/dietpi-moonlight.list"
+			G_EXEC eval "echo 'deb https://dl.cloudsmith.io/public/moonlight-game-streaming/moonlight-embedded/deb/raspbian ${G_DISTRO_NAME/trixie/bookworm} main' > /etc/apt/sources.list.d/dietpi-moonlight.list"
 			G_AGUP
 
 			# APT deps
@@ -11099,7 +11180,7 @@ _EOF_
 			G_EXEC eval "curl -sSfL '$url' | gpg --dearmor -o /etc/apt/trusted.gpg.d/dietpi-moonlight-qt.gpg --yes"
 
 			# APT list
-			G_EXEC eval "echo 'deb https://dl.cloudsmith.io/public/moonlight-game-streaming/moonlight-qt/deb/raspbian/ ${G_DISTRO_NAME/trixie/bookworm} main' > /etc/apt/sources.list.d/dietpi-moonlight-qt.list"
+			G_EXEC eval "echo 'deb https://dl.cloudsmith.io/public/moonlight-game-streaming/moonlight-qt/deb/raspbian ${G_DISTRO_NAME/trixie/bookworm} main' > /etc/apt/sources.list.d/dietpi-moonlight-qt.list"
 			G_AGUP
 
 			# Install: libgl1 required, else start from console prints "SDL Error: Can't load EGL/GL library on window creation.", the GUI says it cannot find a video decoder and streaming does not start.
@@ -11133,7 +11214,7 @@ _EOF_
 				# v3 drops PHP 7.4 support: https://github.com/TasmoAdmin/TasmoAdmin/releases/tag/v3.0.0
 				if (( $G_DISTRO > 6 ))
 				then
-					local fallback_url='https://github.com/TasmoAdmin/TasmoAdmin/releases/download/v4.0.1/tasmoadmin_v4.0.1.tar.gz'
+					local fallback_url='https://github.com/TasmoAdmin/TasmoAdmin/releases/download/v4.1.2/tasmoadmin_v4.1.2.tar.gz'
 					Download_Install "$(curl -sSfL 'https://api.github.com/repos/TasmoAdmin/TasmoAdmin/releases/latest' | mawk -F\" '/^ *"browser_download_url": ".*\/tasmoadmin_v[^"\/]*\.tar\.gz"$/{print $4}')"
 				else
 					Download_Install 'https://github.com/TasmoAdmin/TasmoAdmin/releases/download/v2.4.2/tasmoadmin_v2.4.2.tar.gz'
@@ -11230,7 +11311,7 @@ _EOF_
 			local ha_user='homeassistant'
 			local ha_home="/home/$ha_user"
 			local ha_pyenv_activation=". $ha_home/pyenv-activate.sh"
-			local ha_python_version='3.12.1' # https://github.com/pyenv/pyenv/tree/master/plugins/python-build/share/python-build
+			local ha_python_version='3.12.3' # https://github.com/pyenv/pyenv/tree/master/plugins/python-build/share/python-build
 
 			G_DIETPI-NOTIFY 2 "Home Assistant user:  $ha_user"
 			G_DIETPI-NOTIFY 2 "Home Assistant home:  $ha_home"
@@ -11260,7 +11341,7 @@ _EOF_
 				G_EXEC curl -sSf 'https://sh.rustup.rs/' -o rustup-init.sh
 				G_EXEC chmod +x rustup-init.sh
 				# RPi with 64-bit kernel on 32-bit image: Enforce 32-bit toolchain: https://github.com/MichaIng/DietPi/issues/6306
-				G_EXEC_OUTPUT=1 G_EXEC sudo -u "$ha_user" ./rustup-init.sh -y --profile minimal ${RPI_64KERNEL_32OS:+'--default-host' 'armv7-unknown-linux-gnueabihf'}
+				G_EXEC_OUTPUT=1 G_EXEC runuser -u "$ha_user" -- ./rustup-init.sh -y --profile minimal ${RPI_64KERNEL_32OS:+'--default-host' 'armv7-unknown-linux-gnueabihf'}
 				G_EXEC rm rustup-init.sh
 			fi
 
@@ -11307,7 +11388,7 @@ eval \"\$(pyenv init -)\"
 [ -f '.cargo/env' ] && . .cargo/env" > "$ha_home/pyenv-activate.sh"
 
 			G_EXEC_DESC='Installing Python with Home Assistant module into pyenv'
-			G_EXEC_OUTPUT=1 G_EXEC sudo -u "$ha_user" dash -c "
+			G_EXEC_OUTPUT=1 G_EXEC runuser -u "$ha_user" -- dash -c "
 $ha_pyenv_activation
 pyenv install $ha_python_version
 pyenv local $ha_python_version
@@ -11505,20 +11586,29 @@ _EOF_
 
 		if To_Install 191 snapserver # Snapcast Server
 		then
-			# ARMv6/7/x86_64: Install package from GitHub repo (no Bookworm as package depends on libflac8)
-			if (( $G_DISTRO < 7 )) && [[ $G_HW_ARCH =~ ^(1|2|10)$ ]]
+			# RISC-V: Install from Debian repo: https://github.com/badaix/snapcast/releases
+			if (( $G_HW_ARCH == 11 ))
 			then
-				local arch='armhf'
-				(( $G_HW_ARCH == 10 )) && arch='amd64'
-				local fallback_url="https://github.com/badaix/snapcast/releases/download/v0.27.0/snapserver_0.27.0-1_$arch.deb"
-				Download_Install "$(curl -sSfL 'https://api.github.com/repos/badaix/snapcast/releases/latest' | mawk -F\" "/^ *\"browser_download_url\": \".*\/snapserver_[^\"\/]*_$arch.deb\"/{print \$4}")"
-
-			# Else install from Debian repo
-			else
 				G_AGI snapserver
 
-				# Enable web UI to align with upstream package
-				G_CONFIG_INJECT 'doc_root[[:blank:]=]' 'doc_root = /usr/share/snapserver/snapweb' /etc/snapserver.conf '\[http\]'
+				# Install and enable snapweb web UI, not included in Debian's snapserver package: https://github.com/MichaIng/DietPi/issues/7073
+				local fallback_url='https://github.com/badaix/snapweb/releases/download/v0.7.0/snapweb_0.7.0-1_all.deb'
+				Download_Install "$(curl -sSfL 'https://api.github.com/repos/badaix/snapweb/releases/latest' | mawk -F\" '/^ *"browser_download_url": ".*\/snapweb_[^"\/]*_all.deb"/{print $4}')"
+				G_CONFIG_INJECT 'doc_root[[:blank:]=]' 'doc_root = /usr/share/snapweb' /etc/snapserver.conf '\[http\]'
+
+				# Fix /var/lib/snapserver permissions, just in case badaix's package was previously used, which uses the "snapserver" user, instead of "_snapserver"
+				[[ -d '/var/lib/snapserver' ]] && G_EXEC chown -R '_snapserver:_snapserver' /var/lib/snapserver
+				getent passwd snapserver > /dev/null && G_EXEC userdel snapserver
+			else
+				local arch=$(dpkg --print-architecture) dist=${G_DISTRO_NAME/trixie/bookworm}
+				local fallback_url="https://github.com/badaix/snapcast/releases/download/v0.28.0/snapcast_0.28.0_$arch-debian-$dist.zip"
+				Download_Install "$(curl -sSfL 'https://api.github.com/repos/badaix/snapcast/releases/latest' | mawk -F\" "/^ *\"browser_download_url\": \".*\/snapcast_[^\"\/]*_$arch-debian-$dist.zip\"/{print \$4}")"
+				G_AGI ./snapserver_*_"$arch.deb"
+				G_EXEC rm snap*.deb
+
+				# Fix /var/lib/snapserver permissions, just in case Debian's package was previously used, which uses the "_snapserver" user, instead of "snapserver"
+				[[ -d '/var/lib/snapserver' ]] && G_EXEC chown -R 'snapserver:snapserver' /var/lib/snapserver
+				getent passwd _snapserver > /dev/null && G_EXEC userdel _snapserver
 			fi
 			G_EXEC systemctl stop snapserver
 
@@ -11528,17 +11618,16 @@ _EOF_
 
 		if To_Install 192 snapclient # Snapcast Client
 		then
-			# ARMv6/7/x86_64: Install package from GitHub repo (no Bookworm as package depends on libflac8)
-			if (( $G_DISTRO < 7 )) && [[ $G_HW_ARCH =~ ^(1|2|10)$ ]]
+			# RISC-V: Install from Debian repo: https://github.com/badaix/snapcast/releases
+			if (( $G_HW_ARCH == 11 ))
 			then
-				local arch='armhf'
-				(( $G_HW_ARCH == 10 )) && arch='amd64'
-				local fallback_url="https://github.com/badaix/snapcast/releases/download/v0.27.0/snapclient_0.27.0-1_without-pulse_$arch.deb"
-				Download_Install "$(curl -sSfL 'https://api.github.com/repos/badaix/snapcast/releases/latest' | mawk -F\" "/^ *\"browser_download_url\": \".*\/snapclient_[^\"\/]*_without-pulse_$arch.deb\"$/{print \$4}")"
-
-			# Else install from Debian repo
-			else
 				G_AGI snapclient
+			else
+				local arch=$(dpkg --print-architecture) dist=${G_DISTRO_NAME/trixie/bookworm}
+				local fallback_url="https://github.com/badaix/snapcast/releases/download/v0.28.0/snapcast_0.28.0_$arch-debian-$dist.zip"
+				Download_Install "$(curl -sSfL 'https://api.github.com/repos/badaix/snapcast/releases/latest' | mawk -F\" "/^ *\"browser_download_url\": \".*\/snapcast_[^\"\/]*_$arch-debian-$dist.zip\"/{print \$4}")"
+				G_AGI ./snapclient_*_without-pulse_"$arch.deb"
+				G_EXEC rm snap*.deb
 			fi
 			G_EXEC systemctl stop snapclient
 
@@ -11587,7 +11676,7 @@ _EOF_
 					*) local arch='amd64';;
 				esac
 
-				local fallback_url="https://github.com/rclone/rclone/releases/download/v1.66.0/rclone-v1.66.0-linux-$arch.deb"
+				local fallback_url="https://github.com/rclone/rclone/releases/download/v1.67.0/rclone-v1.67.0-linux-$arch.deb"
 				Download_Install "$(curl -sSfL 'https://api.github.com/repos/rclone/rclone/releases/latest' | mawk -F\" "/^ *\"browser_download_url\": \".*\/rclone-v[^\"\/]*-linux-$arch.deb\"$/{print \$4}")"
 			fi
 		fi
@@ -11601,7 +11690,7 @@ _EOF_
 				*) local arch='arm';;
 			esac
 
-			local fallback_url="https://github.com/restic/restic/releases/download/v0.16.4/restic_0.16.4_linux_$arch.bz2"
+			local fallback_url="https://github.com/restic/restic/releases/download/v0.17.0/restic_0.17.0_linux_$arch.bz2"
 			Download_Install "$(curl -sSfL 'https://api.github.com/repos/restic/restic/releases/latest' | mawk -F\" "/^ *\"browser_download_url\": \".*\/restic_[^\"\/]*_linux_$arch\.bz2\"$/{print \$4}")" /usr/local/bin/restic
 			G_EXEC chmod +x /usr/local/bin/restic
 		fi
@@ -11623,7 +11712,7 @@ _EOF_
 			fi
 
 			# Get latest version
-			local fallback_url='https://releases.wikimedia.org/mediawiki/1.40/mediawiki-1.40.0.tar.gz'
+			local fallback_url='https://releases.wikimedia.org/mediawiki/1.41/mediawiki-1.41.1.tar.gz'
 			Download_Install "$(curl -sSfL 'https://www.mediawiki.org/wiki/Download' | grep -o 'https://releases\.wikimedia\.org/mediawiki/[^/"]*/mediawiki-[^"]*\.tar\.gz' | head -1)"
 
 			# Enable required PHP modules
@@ -11651,11 +11740,16 @@ location ^~ /wiki/images {
 _EOF_
 			fi
 
-			# Reinstall: Clean install but preserve existing config file
+			# Reinstall: Clean install but preserve existing config and uploaded images
 			if [[ -f '/var/www/wiki/LocalSettings.php' ]]
 			then
 				G_EXEC mv /var/www/wiki/LocalSettings.php mediawiki-*/
 				G_EXEC chmod 600 mediawiki-*/LocalSettings.php
+			fi
+			if [[ -d '/var/www/wiki/images' ]]
+			then
+				G_EXEC cp -a mediawiki-*/images/{.htaccess,README} /var/www/wiki/images/
+				G_EXEC cp -a /var/www/wiki/images/. mediawiki-*/images/
 			fi
 			G_EXEC chown -R www-data:www-data mediawiki-*
 			[[ -d '/var/www/wiki' ]] && G_EXEC rm -R /var/www/wiki
@@ -11713,7 +11807,7 @@ _EOF_
 				*) local arch='amd64';;
 			esac
 
-			local fallback_url="https://github.com/filebrowser/filebrowser/releases/download/v2.28.0/linux-$arch-filebrowser.tar.gz"
+			local fallback_url="https://github.com/filebrowser/filebrowser/releases/download/v2.30.0/linux-$arch-filebrowser.tar.gz"
 			Download_Install "$(curl -sSfL 'https://api.github.com/repos/filebrowser/filebrowser/releases/latest' | mawk -F\" "/^ *\"browser_download_url\": \".*\/linux-$arch-filebrowser\.tar\.gz\"$/{print \$4}")" ./filebrowser/
 
 			# Reinstall
@@ -11856,27 +11950,18 @@ _EOF_
 			G_EXEC mkdir -p /mnt/dietpi_userdata/adsb-feeder/config
 			G_EXEC ln -s /mnt/dietpi_userdata/adsb-feeder/config .
 
-			# set the 'image name' and version that are shown in the footer of the Web UI
+			# set the 'image name' and version that are shown in the footer of the Web UI and mark as app, not image
 			G_EXEC eval 'echo '\''ADSB Feeder app running on DietPi'\'' > feeder-image.name'
 			G_EXEC eval "echo '$ADSB_FEEDER_VERSION' > adsb.im.version"
+			G_EXEC rm -f os.adsb.feeder.image
+			G_EXEC touch app.adsb.feeder.image
 
-			# get the Python module
-			# for older distros we need to install via pip in order to get flask 2
-			if (( $G_DISTRO < 7 ))
-			then
-				G_EXEC_OUTPUT=1 G_EXEC pip3 install -U flask
-			else
-				G_AGI python3-flask
-			fi
+			# get the Python modules
+			G_EXEC_OUTPUT=1 G_EXEC pip3 install -U flask requests
 
 			# finally ensure that /run allows executables (this is needed for the containers to be able to not do excessive
 			# writes to physical storage - which might be an SD card)
 			G_EXEC mount -o remount,exec /run
-
-			# now that everything is in place, run the one time service to get the software pre-configured
-			# running this as a service allows it to do a bit of housekeeping in the background without disrupting
-			# the software install flow
-			G_EXEC systemctl start adsb-nonimage
 		fi
 
 		if To_Install 172 # WireGuard
@@ -12036,6 +12121,70 @@ If no WireGuard (auto)start is included, but you require it, please do the follo
 			fi
 
 			unset -v choice_required domain port invalid_text server_ip
+		fi
+
+		if To_Install 213 soju # soju
+		then
+			# Dependencies
+			aDEPS=('make' 'scdoc' 'gcc' 'libsqlite3-dev' 'libpam-dev')
+
+			# Download
+			local fallback_url='https://github.com/emersion/soju/releases/download/v0.8.0/soju-0.8.0.tar.gz'
+			Download_Install "$(curl -sSfL 'https://api.github.com/repos/emersion/soju/releases/latest' | mawk -F\" '/^ *"browser_download_url": ".*\/soju-[^"\/]*\.tar\.gz"$/{print $4}')"
+
+			# Build
+			G_EXEC cd soju-*
+			G_EXEC_OUTPUT=1 G_EXEC make all "-j$(nproc)" config_path='/mnt/dietpi_userdata/soju/config' GOFLAGS='-tags=pam,libsqlite3'
+
+			# Install
+			local commands=('soju' 'sojuctl' 'sojudb')
+			local manpages=('doc/soju.1' 'doc/sojuctl.1')
+			G_EXEC cp "${commands[@]}" /usr/local/bin/
+			G_EXEC mkdir -p /usr/local/share/man/man1
+			G_EXEC cp "${manpages[@]}" /usr/local/share/man/man1/
+
+			# Config
+			if [[ ! -f '/mnt/dietpi_userdata/soju/config' ]]
+			then
+				# We shall default to on-disk chat logs
+				# It's a lossy format, as stated under `message-store` subsection in https://soju.im/doc/soju.1.html#CONFIG_FILE
+				# But it's the recommended setting as per https://git.sr.ht/~emersion/soju/tree/master/doc/getting-started.md
+				G_EXEC mkdir -p /mnt/dietpi_userdata/soju
+				cat <<- '_EOF_' > /mnt/dietpi_userdata/soju/config
+				db sqlite3 /mnt/dietpi_userdata/soju/data.db
+				message-store fs /mnt/dietpi_userdata/soju/logs
+				listen irc+insecure://
+				listen unix+admin://
+				_EOF_
+			fi
+
+			# User
+			Create_User -d /mnt/dietpi_userdata/soju soju
+			G_EXEC chown 'soju:soju' -R /mnt/dietpi_userdata/soju
+			G_EXEC chmod 0660 -R /mnt/dietpi_userdata/soju
+			G_EXEC chmod 0770 /mnt/dietpi_userdata/soju
+
+			# Service: https://github.com/emersion/soju/blob/master/contrib/soju.service
+			# - CAP_NET_BIND_SERVICE needed for builtin identd server: https://github.com/emersion/soju/blob/master/doc/packaging.md#binding-to-privileged-ports
+			cat << '_EOF_' > /etc/systemd/system/soju.service
+[Unit]
+Description=soju IRC bouncer service
+Documentation=https://soju.im/
+Documentation=man:soju(1) man:sojuctl(1)
+Wants=network-online.target
+After=network-online.target
+
+[Service]
+User=soju
+RuntimeDirectory=soju
+WorkingDirectory=/mnt/dietpi_userdata/soju
+AmbientCapabilities=CAP_NET_BIND_SERVICE
+ExecStart=/usr/local/bin/soju
+ExecReload=/bin/kill -HUP $MAINPID
+
+[Install]
+WantedBy=multi-user.target
+_EOF_
 		fi
 	}
 
@@ -12305,8 +12454,8 @@ If no WireGuard (auto)start is included, but you require it, please do the follo
 			systemctl start redis-server
 			if systemctl start mariadb
 			then
-				sudo -u www-data php /var/www/nextcloud/occ maintenance:mode --off
-				sudo -u www-data php /var/www/nextcloud/occ app:disable spreed
+				runuser -u www-data -- php /var/www/nextcloud/occ maintenance:mode --off
+				runuser -u www-data -- php /var/www/nextcloud/occ app:disable spreed
 			fi
 			G_DIETPI-NOTIFY 2 'Disabled Nextcloud Talk app, but you need to remove it manually from Nextcloud web UI, if desired.'
 		fi
@@ -12576,8 +12725,8 @@ If no WireGuard (auto)start is included, but you require it, please do the follo
 			[[ -d '/mnt/dietpi_userdata/synapse' ]] && G_EXEC rm -R /mnt/dietpi_userdata/synapse
 
 			command -v pip3 > /dev/null && G_EXEC_OUTPUT=1 G_EXEC pip3 uninstall -y matrix-synapse
-			command -v dropdb > /dev/null && sudo -u postgres dropdb synapse
-			command -v dropuser > /dev/null && sudo -u postgres dropuser synapse
+			command -v dropdb > /dev/null && runuser -u postgres -- dropdb synapse
+			command -v dropuser > /dev/null && runuser -u postgres -- dropuser synapse
 		fi
 
 		if To_Uninstall 132 # Aria2
@@ -12816,11 +12965,7 @@ If no WireGuard (auto)start is included, but you require it, please do the follo
 
 		if To_Uninstall 37 # Shairport Sync
 		then
-			G_AGP shairport-sync
-			# Pre-v6.29
-			Remove_Service shairport-sync
-			[[ -f '/lib/systemd/system/shairport-sync.service' ]] && G_EXEC rm /lib/systemd/system/shairport-sync.service
-			G_EXEC rm -f /usr/local/bin/shairport-sync /usr/local/etc/shairport-sync.conf* /usr/local/share/man/man7/shairport-sync.7.gz
+			G_AGP shairport-sync shairport-sync-airplay2
 		fi
 
 		if To_Uninstall 152 # Avahi-Daemon
@@ -12874,20 +13019,25 @@ If no WireGuard (auto)start is included, but you require it, please do the follo
 
 		if To_Uninstall 62 # Box86
 		then
-			[[ -f '/usr/local/bin/box86' ]] && G_EXEC rm /usr/local/bin/box86
 			[[ -f '/etc/binfmt.d/box86.conf' ]] && G_EXEC rm /etc/binfmt.d/box86.conf
-			[[ -f '/usr/lib/i386-linux-gnu/libstdc++.so.6' ]] && G_EXEC rm /usr/lib/i386-linux-gnu/libstdc++.so.6
-			[[ -f '/usr/lib/i386-linux-gnu/libstdc++.so.5' ]] && G_EXEC rm /usr/lib/i386-linux-gnu/libstdc++.so.5
-			[[ -f '/usr/lib/i386-linux-gnu/libgcc_s.so.1' ]] && G_EXEC rm /usr/lib/i386-linux-gnu/libgcc_s.so.1
+			[[ -d '/proc/sys/fs/binfmt_misc' ]] && G_EXEC systemctl restart systemd-binfmt
+			[[ -f '/usr/local/bin/box86' ]] && G_EXEC rm /usr/local/bin/box86
+			for i in /usr/lib/i386-linux-gnu/lib{gcc_s,png12,stdc++,unwind}.so*
+			do
+				[[ -e $i ]] && ! dpkg-query -S "$i" &> /dev/null && G_EXEC rm "$i"
+			done
 			[[ -d '/usr/lib/i386-linux-gnu' ]] && G_EXEC rmdir --ignore-fail-on-non-empty /usr/lib/i386-linux-gnu
 		fi
 
 		if To_Uninstall 197 # Box64
 		then
-			[[ -f '/usr/local/bin/box64' ]] && G_EXEC rm /usr/local/bin/box64
 			[[ -f '/etc/binfmt.d/box64.conf' ]] && G_EXEC rm /etc/binfmt.d/box64.conf
-			[[ -f '/usr/lib/x86_64-linux-gnu/libstdc++.so.6' ]] && G_EXEC rm /usr/lib/x86_64-linux-gnu/libstdc++.so.6
-			[[ -f '/usr/lib/x86_64-linux-gnu/libgcc_s.so.1' ]] && G_EXEC rm /usr/lib/x86_64-linux-gnu/libgcc_s.so.1
+			[[ -d '/proc/sys/fs/binfmt_misc' ]] && G_EXEC systemctl restart systemd-binfmt
+			[[ -f '/usr/local/bin/box64' ]] && G_EXEC rm /usr/local/bin/box64
+			for i in /usr/lib/x86_64-linux-gnu/lib{crypto,gcc_s,mbed,png12,ssl,stdc++,unwind}*
+			do
+				[[ -e $i ]] && ! dpkg-query -S "$i" &> /dev/null && G_EXEC rm "$i"
+			done
 			[[ -d '/usr/lib/x86_64-linux-gnu' ]] && G_EXEC rmdir --ignore-fail-on-non-empty /usr/lib/x86_64-linux-gnu
 		fi
 
@@ -13560,6 +13710,17 @@ _EOF_
 			Remove_Database gitea
 		fi
 
+		if To_Uninstall 177 # Forgejo
+		then
+			Remove_Service forgejo 1 1
+
+			# Data
+			[[ -d '/mnt/dietpi_userdata/forgejo' ]] && G_EXEC rm -R /mnt/dietpi_userdata/forgejo
+			[[ -d '/var/log/forgejo' ]] && G_EXEC rm -R /var/log/forgejo
+
+			Remove_Database forgejo
+		fi
+
 		if To_Uninstall 166 # Audiophonics PI-SPC
 		then
 			Remove_Service pi-spc
@@ -13703,15 +13864,13 @@ _EOF_
 		if To_Uninstall 163 # GMediaRender
 		then
 			G_AGP gmediarender
-			# Pre-v8.10
-			Remove_Service gmediarender gmrender gmrender
-			[[ -f '/usr/local/bin/gmediarender' ]] && G_EXEC rm /usr/local/bin/gmediarender
-			[[ -d '/usr/local/share/gmediarender' ]] && G_EXEC rm -R /usr/local/share/gmediarender
 		fi
 
 		if To_Uninstall 67 # Firefox
 		then
 			G_AGP firefox-esr
+			G_EXEC rm -Rf /{root,home/*}/.mozilla/firefox
+			for i in /{root,home/*}/.mozilla; do [[ -d $i ]] && G_EXEC rmdir --ignore-fail-on-non-empty "$i"; done
 		fi
 
 		if To_Uninstall 159 # Allo GUI full
@@ -14097,6 +14256,9 @@ _EOF_
 		if To_Uninstall 191 # Snapcast Server
 		then
 			G_AGP snapserver
+			# Remove users from Debian's and badaix's packages, to cleanly cover upgrades from one to the other.
+			getent passwd snapserver > /dev/null && G_EXEC userdel snapserver
+			getent passwd _snapserver > /dev/null && G_EXEC userdel _snapserver
 		fi
 
 		if To_Uninstall 192 # Snapcast Client
@@ -14154,6 +14316,24 @@ _EOF_
 			Remove_Service spotifyd 1 1
 			[[ -d '/opt/spotifyd' ]] && G_EXEC rm -R /opt/spotifyd
 			[[ -d '/mnt/dietpi_userdata/spotifyd' ]] && G_EXEC rm -R /mnt/dietpi_userdata/spotifyd
+		fi
+
+		if To_Uninstall 213 # soju
+		then
+			Remove_Service soju 1 1
+			local x
+			local commands=('soju' 'sojuctl' 'sojudb')
+			local manpages=('soju.1' 'sojuctl.1')
+			for x in "${commands[@]}"
+			do
+				[[ -f /usr/local/bin/$x ]] && G_EXEC rm "/usr/local/bin/$x"
+			done
+			for x in "${manpages[@]}"
+			do
+				[[ -f /usr/local/share/man/man1/$x ]] && G_EXEC rm "/usr/local/share/man/man1/$x"
+			done
+			[[ -d '/usr/local/share/man/man1' ]] && G_EXEC rmdir -p --ignore-fail-on-non-empty /usr/local/share/man/man1
+			[[ -d '/mnt/dietpi_userdata/soju' ]] &&	G_EXEC rm -Rf /mnt/dietpi_userdata/soju
 		fi
 
 		G_DIETPI-NOTIFY 3 "$G_PROGRAM_NAME" 'Finalising uninstall'
@@ -14420,13 +14600,14 @@ _EOF_
 		if [[ ! -f '/boot/dietpi/.skip_distro_upgrade' ]]
 		then
 			G_AGUP
-			# Do not repeat APT update in Run_Installations()
-			SKIP_APT_UPDATE=1
 			G_AGDUG
+			G_AGA
 			# Create a persistent flag to not repeat G_AGDUG and rule out a reboot loop when kernel modules remain missing
 			G_EXEC eval '> /boot/dietpi/.skip_distro_upgrade'
 			# Perform a reboot if required as of missing kernel modules
-			G_CHECK_KERNEL || { G_DIETPI-NOTIFY 2 'A reboot is done to finalise the kernel upgrade'; reboot; }
+			G_CHECK_KERNEL || { G_DIETPI-NOTIFY 2 'A reboot is done to finalise the kernel upgrade'; sync; reboot; exit 0; }
+			# Do not repeat APT update in Run_Installations()
+			SKIP_APT_UPDATE=1
 		fi
 
 		# Global PW
@@ -15023,13 +15204,13 @@ We allow it to take up to 30 minutes, it's process can be followed, please be pa
 			# Add option to use Unbound as upstream DNS server
 			if (( ${aSOFTWARE_INSTALL_STATE[182]} == 0 ))
 			then
-				G_WHIP_YESNO 'Would you like to use Unbound, a tiny recursive DNS server hosted on your device, as your upstream DNS server?
+				G_WHIP_BUTTON_CANCEL_TEXT='Skip' G_WHIP_YESNO 'Would you like to use Unbound, a tiny recursive DNS server hosted on your device, as your upstream DNS server?
 \nThis will increase privacy, because you will not be sending data to Google etc.
 \nHowever, the downside is that some websites may load slower the first time you visit them.' && aSOFTWARE_INSTALL_STATE[182]=1
 			fi
 
 			# Prompt for static IP
-			if G_WHIP_YESNO 'A static IP address is essential for a DNS server installations. DietPi-Config can be used to quickly setup your static IP address.
+			if G_WHIP_BUTTON_CANCEL_TEXT='Skip' G_WHIP_YESNO 'A static IP address is essential for a DNS server installation. DietPi-Config can be used to quickly setup your static IP address.
 \nIf you have already setup your static IP, please ignore this message.\n\nWould you like to setup your static IP address now?'
 			then
 				G_WHIP_MSG 'DietPi-Config will now be launched. Simply select your Ethernet or Wifi connection from the menu to access the IP address settings.

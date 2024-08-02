@@ -58,14 +58,12 @@
 	Menu_Main()
 	{
 		G_WHIP_MENU_ARRAY=(
-
 			'1' ': Display Options'
 			'2' ': Audio Options'
 		)
 		# Hide performance options on VM and container
 		(( $G_HW_MODEL == 20 || $G_HW_MODEL == 75 )) || G_WHIP_MENU_ARRAY+=('3' ': Performance Options')
 		 G_WHIP_MENU_ARRAY+=(
-
 			'4' ': Advanced Options'
 			'5' ': Language/Regional Options'
 			'6' ': Security Options'
@@ -92,23 +90,22 @@
 		esac
 	}
 
+	# $1: 0=landscape 1=portrait
 	Display_Rotation_Calc_XY_Invert()
 	{
-		# 0=landscape 1=portrait
-		local input=$1
-
 		local framebuffer_x=$(grep -m1 '^[[:blank:]]*framebuffer_width=' /boot/config.txt || vcgencmd get_config framebuffer_width)
 		framebuffer_x=${framebuffer_x#*=}; framebuffer_x=${framebuffer_x:-0}
 		local framebuffer_y=$(grep -m1 '^[[:blank:]]*framebuffer_height=' /boot/config.txt || vcgencmd get_config framebuffer_height)
 		framebuffer_y=${framebuffer_y#*=}; framebuffer_y=${framebuffer_y:-0}
+
 		# 0/180 landscape
-		if (( $input == 0 && $framebuffer_x < $framebuffer_y ))
+		if (( $1 == 0 && $framebuffer_x < $framebuffer_y ))
 		then
 			G_CONFIG_INJECT 'framebuffer_width=' "framebuffer_width=$framebuffer_y" /boot/config.txt
 			G_CONFIG_INJECT 'framebuffer_height=' "framebuffer_height=$framebuffer_x" /boot/config.txt
 
 		# 90/270 portrait
-		elif (( $input == 1 && $framebuffer_x > $framebuffer_y ))
+		elif (( $1 == 1 && $framebuffer_x > $framebuffer_y ))
 		then
 			G_CONFIG_INJECT 'framebuffer_width=' "framebuffer_width=$framebuffer_y" /boot/config.txt
 			G_CONFIG_INJECT 'framebuffer_height=' "framebuffer_height=$framebuffer_x" /boot/config.txt
@@ -118,34 +115,35 @@
 	# TARGETMENUID=1
 	Menu_DisplayOptions()
 	{
-		if (( $G_HW_MODEL == 21 )); then
-
+		# Driver/Resolution
+		if (( $G_HW_MODEL == 21 ))
+		then
 			G_WHIP_MENU_ARRAY=('1' ': Display Driver')
-
 		else
-
 			G_WHIP_MENU_ARRAY=('1' ': Display Resolution')
-
-			(( $G_HW_MODEL < 10 || $G_HW_MODEL == 12 )) && G_WHIP_MENU_ARRAY+=('2' ': GPU/RAM Memory Split')
 
 			if (( $G_HW_MODEL < 20 ))
 			then
 				local lcdpanel_text=$(sed -n '/^[[:blank:]]*CONFIG_LCDPANEL=/{s/^[^=]*=//p;q}' /boot/dietpi.txt)
 				G_WHIP_MENU_ARRAY+=('3' ": LCD/OLED Panel addon: [${lcdpanel_text:=none}]")
 			fi
-
 		fi
 
-		# Display brightness
+		# Brightness
 		G_WHIP_MENU_ARRAY+=('16' ': Display Brightness')
 
+		# X11 DPI
 		local xorg_dpi_current=$(sed -n '/^[[:blank:]]*SOFTWARE_XORG_DPI=/{s/^[^=]*=//p;q}' /boot/dietpi.txt)
 		G_WHIP_MENU_ARRAY+=('17' ": X.Org DPI: [${xorg_dpi_current:-N/A}]")
 
-		(( $G_HW_MODEL == 20 )) || G_WHIP_MENU_ARRAY+=('14' ': LED Control')
+		# LED control: Hide on VM/container
+		(( $G_HW_MODEL == 20 || $G_HW_MODEL == 75 )) || G_WHIP_MENU_ARRAY+=('14' ': LED Control')
 
 		# RPi only
-		if (( $G_HW_MODEL < 10 )); then
+		if (( $G_HW_MODEL < 10 ))
+		then
+			# GPU memory split
+			G_WHIP_MENU_ARRAY+=('2' ': GPU/RAM memory split')
 
 			# HDMI rotation
 			local rotation_hdmi_current=$(sed -n '/^[[:blank:]]*display_hdmi_rotate=/{s/^[^=]*=//p;q}' /boot/config.txt)
@@ -161,23 +159,21 @@
 			(( $overscan_disabled )) && overscan_text='Off'
 			G_WHIP_MENU_ARRAY+=('6' ": Overscan            : [$overscan_text]")
 			# - Overscan sizes
-			if (( ! $overscan_disabled )); then
-
+			if (( ! $overscan_disabled ))
+			then
 				local overscan_options=('overscan_left' 'overscan_right' 'overscan_top' 'overscan_bottom')
 				local overscan_left=$(grep -m1 '^[[:blank:]]*overscan_left=' /boot/config.txt || vcgencmd get_config overscan_left); overscan_left=${overscan_left#*=}
 				local overscan_right=$(grep -m1 '^[[:blank:]]*overscan_right=' /boot/config.txt || vcgencmd get_config overscan_right); overscan_right=${overscan_right#*=}
 				local overscan_top=$(grep -m1 '^[[:blank:]]*overscan_top=' /boot/config.txt || vcgencmd get_config overscan_top); overscan_top=${overscan_top#*=}
 				local overscan_bottom=$(grep -m1 '^[[:blank:]]*overscan_bottom=' /boot/config.txt || vcgencmd get_config overscan_bottom); overscan_bottom=${overscan_bottom#*=}
 				G_WHIP_MENU_ARRAY+=('15' ": Overscan Compensation [L:${overscan_left:-N/A}] [R:${overscan_right:-N/A}] [T:${overscan_top:-N/A}] [B:${overscan_bottom:-N/A}]")
-
 			fi
 
 			# HDMI signal boost, RPi up to 3 only
-			if (( $G_HW_MODEL < 4 )); then
-
+			if (( $G_HW_MODEL < 4 ))
+			then
 				local hdmi_boost_current=$(grep -m1 '^[[:blank:]]*config_hdmi_boost=' /boot/config.txt || vcgencmd get_config config_hdmi_boost); hdmi_boost_current=${hdmi_boost_current#*=}
 				G_WHIP_MENU_ARRAY+=('7'	": HDMI Boost          : [${hdmi_boost_current:-N/A}]")
-
 			fi
 
 			# RPi codecs
@@ -211,29 +207,25 @@
 			G_WHIP_MENU_ARRAY+=('13' ": MPEG2 Key           : [${mpeg2_key_current:-none}]")
 
 		# Odroids only
-		elif (( $G_HW_MODEL < 13 )); then
-
+		elif (( $G_HW_MODEL < 13 ))
+		then
 			# Remote
 			local odroid_remote_text='Off'
 			local odroid_remote_enabled=0
-			if [[ -f '/etc/systemd/system/odroid-remote.service' ]]; then
-
+			if grep -Eq '^[[:blank:]]*(gpio-ir-recv|meson_ir)[[:blank:]]*$' /etc/modules || systemctl -q is-enabled lircd 2> /dev/null
+			then
 				odroid_remote_text='On'
 				odroid_remote_enabled=1
-
 			fi
 			G_WHIP_MENU_ARRAY+=('10' ": Odroid remote : [$odroid_remote_text]")
-
 		fi
 
 		G_WHIP_DEFAULT_ITEM=$WHIP_SELECTION_PREVIOUS
-
 		G_WHIP_MENU 'Please select an option:' || { Back_or_Exit 0; return 0; } # Main menu
-
 		WHIP_SELECTION_PREVIOUS=$G_WHIP_RETURNED_VALUE
 
-		if (( $G_WHIP_RETURNED_VALUE == 15 )); then
-
+		if (( $G_WHIP_RETURNED_VALUE == 15 ))
+		then
 			for i in "${overscan_options[@]}"
 			do
 				G_WHIP_DEFAULT_ITEM=${!i}
@@ -243,25 +235,22 @@
 				REBOOT_REQUIRED=1
 			done
 
-		elif (( $G_WHIP_RETURNED_VALUE == 1 )); then
-
+		elif (( $G_WHIP_RETURNED_VALUE == 1 ))
+		then
 			TARGETMENUID=2
 
-		elif (( $G_WHIP_RETURNED_VALUE == 3 )); then
-
+		elif (( $G_WHIP_RETURNED_VALUE == 3 ))
+		then
 			G_WHIP_MENU_ARRAY=('none' ': Uninstall all panels')
 			G_WHIP_MENU_ARRAY+=('waveshare32' ': 320x240 panel with touch input')
 
-			if (( $G_HW_MODEL < 10 )); then
-
+			if (( $G_HW_MODEL < 10 ))
+			then
 				G_WHIP_MENU_ARRAY+=('esp01215e' ': Elecrow 1024x600 7" IPS HDMI panel with touch input')
 				G_WHIP_MENU_ARRAY+=('allo-boss2-oled' ': Allo Boss2 DAC OLED display')
-
 			else
-
 				G_WHIP_MENU_ARRAY+=('odroid-lcd35' ': 480x320 panel with touch input')
-				(( $G_HW_MODEL == 11 )) && G_WHIP_MENU_ARRAY+=('odroid-cloudshell' ': 320x240 panel')
-
+				(( $G_HW_MODEL == 11 )) && G_WHIP_MENU_ARRAY+=('odroid-cloudshell' ': 320x240 panel' 'odroid-cloudshell2' ': Odroid XU4 CloudShell 2 LCD')
 			fi
 
 			G_WHIP_DEFAULT_ITEM=$lcdpanel_text
@@ -269,32 +258,27 @@
 
 			/boot/dietpi/func/dietpi-set_hardware lcdpanel "$G_WHIP_RETURNED_VALUE" && REBOOT_REQUIRED=1
 
-		elif (( $G_WHIP_RETURNED_VALUE == 2 )); then
-
-			G_WHIP_MSG 'GPU/RAM Memory splits are pre-configured and applied during DietPi-Software setup.\n\nThe split value is optimized based on your software installs, however, feel free to tweak them.'
+		elif (( $G_WHIP_RETURNED_VALUE == 2 ))
+		then
 			TARGETMENUID=6
 
-		elif (( $G_WHIP_RETURNED_VALUE == 6 )); then
-
-			if (( $overscan_disabled )); then
-
+		elif (( $G_WHIP_RETURNED_VALUE == 6 ))
+		then
+			if (( $overscan_disabled ))
+			then
 				G_CONFIG_INJECT 'disable_overscan=' 'disable_overscan=0' /boot/config.txt
-
 			else
-
 				G_CONFIG_INJECT 'disable_overscan=' 'disable_overscan=1' /boot/config.txt
 				for i in "${overscan_options[@]}"
 				do
 					sed --follow-symlinks -i "/^[[:blank:]]*$i=/c\#$i=0" /boot/config.txt
 				done
-
 			fi
 			REBOOT_REQUIRED=1
 
-		elif (( $G_WHIP_RETURNED_VALUE == 7 )); then
-
+		elif (( $G_WHIP_RETURNED_VALUE == 7 ))
+		then
 			G_WHIP_MENU_ARRAY=(
-
 				'0' ': Disabled'
 				'2' ': RPi 1 A/B Default'
 				'5' ': RPi 1+/2/3 Default'
@@ -312,49 +296,47 @@ A long (or insufficiently manufactured) cable may required a higher boost settin
 
 			G_CONFIG_INJECT 'config_hdmi_boost=' "config_hdmi_boost=$G_WHIP_RETURNED_VALUE" /boot/config.txt && REBOOT_REQUIRED=1
 
-		elif (( $G_WHIP_RETURNED_VALUE == 18 )); then
-
+		elif (( $G_WHIP_RETURNED_VALUE == 18 ))
+		then
 			/boot/dietpi/func/dietpi-set_hardware rpi-codec $(( ! $rpi_codecs_enabled )) && REBOOT_REQUIRED=1
 
-		elif (( $G_WHIP_RETURNED_VALUE == 8 )); then
-
+		elif (( $G_WHIP_RETURNED_VALUE == 8 ))
+		then
 			/boot/dietpi/func/dietpi-set_hardware rpi-camera $(( ! $rpi_camera_module_enabled )) && REBOOT_REQUIRED=1
 
-		elif (( $G_WHIP_RETURNED_VALUE == 9 )); then
-
+		elif (( $G_WHIP_RETURNED_VALUE == 9 ))
+		then
 			G_CONFIG_INJECT 'disable_camera_led=' "disable_camera_led=$(( ! $rpi_camera_led_disabled ))" /boot/config.txt && REBOOT_REQUIRED=1
 
-		elif (( $G_WHIP_RETURNED_VALUE == 10 )); then
-
-			if (( $odroid_remote_enabled )); then
-
+		elif (( $G_WHIP_RETURNED_VALUE == 10 ))
+		then
+			if (( $odroid_remote_enabled ))
+			then
 				/boot/dietpi/func/dietpi-set_hardware remoteir none && REBOOT_REQUIRED=1
 
-			elif G_WHIP_YESNO 'This will enable the IR modules, setup Lirc and the Odroid Remote for Odroid C1, C2 and XU4 Cloudshell.
-\nNB: Other remotes can be configured by running "irrecord" and applying the codes to "/etc/lirc/lircd.conf"\n\nDo you wish to continue?'; then
-
+			elif G_WHIP_YESNO 'This will enable the IR modules, setup Lirc and the Odroid Remote for Odroid C1, C2 and XU4 CloudShell.
+\nNB: Other remotes can be configured by running "irrecord" and applying the codes to "/etc/lirc/lircd.conf"\n\nDo you wish to continue?'
+			then
 				/boot/dietpi/func/dietpi-set_hardware remoteir odroid_remote && REBOOT_REQUIRED=1
-
 			fi
 
-		elif (( $G_WHIP_RETURNED_VALUE == 11 )); then
-
-			if (( $justboom_ir_remote_enabled )); then
-
+		elif (( $G_WHIP_RETURNED_VALUE == 11 ))
+		then
+			if (( $justboom_ir_remote_enabled ))
+			then
 				/boot/dietpi/func/dietpi-set_hardware remoteir none && REBOOT_REQUIRED=1
 
 			elif G_WHIP_YESNO 'Got a JustBoom IR Remote? Excellent!
-\nDietPi will enable the IR modules, setup Lirc and enable support for MPD controls by default:\n\nDo you wish to continue?'; then
-
+\nDietPi will enable the IR modules, setup Lirc and enable support for MPD controls by default:\n\nDo you wish to continue?'
+			then
 				/boot/dietpi/func/dietpi-set_hardware remoteir justboom_ir_remote && REBOOT_REQUIRED=1
-
 			fi
 
-		elif (( $G_WHIP_RETURNED_VALUE == 12 )); then
-
+		elif (( $G_WHIP_RETURNED_VALUE == 12 ))
+		then
 			G_WHIP_DEFAULT_ITEM=$vc1_key_current
-			if G_WHIP_INPUTBOX 'Please enter your key for VC1:\n - EG: 0x00000000'; then
-
+			if G_WHIP_INPUTBOX 'Please enter your key for VC1:\n - EG: 0x00000000'
+			then
 				G_CONFIG_INJECT 'decode_WVC1=' "decode_WVC1=$G_WHIP_RETURNED_VALUE" /boot/config.txt
 
 				# https://github.com/MichaIng/DietPi/issues/1487
@@ -362,14 +344,13 @@ A long (or insufficiently manufactured) cable may required a higher boost settin
 				(( ${current_gpu_mem:=76} < 96 )) && /boot/dietpi/func/dietpi-set_hardware gpumemsplit 96
 
 				REBOOT_REQUIRED=1
-
 			fi
 
-		elif (( $G_WHIP_RETURNED_VALUE == 13 )); then
-
+		elif (( $G_WHIP_RETURNED_VALUE == 13 ))
+		then
 			G_WHIP_DEFAULT_ITEM=$mpeg2_key_current
-			if G_WHIP_INPUTBOX 'Please enter your key for MPEG2:\n - EG: 0x00000000'; then
-
+			if G_WHIP_INPUTBOX 'Please enter your key for MPEG2:\n - EG: 0x00000000'
+			then
 				G_CONFIG_INJECT 'decode_MPG2=' "decode_MPG2=$G_WHIP_RETURNED_VALUE" /boot/config.txt
 
 				# https://github.com/MichaIng/DietPi/issues/1487
@@ -377,13 +358,11 @@ A long (or insufficiently manufactured) cable may required a higher boost settin
 				(( ${current_gpu_mem:=76} < 96 )) && /boot/dietpi/func/dietpi-set_hardware gpumemsplit 96
 
 				REBOOT_REQUIRED=1
-
 			fi
 
-		elif (( $G_WHIP_RETURNED_VALUE == 4 )); then
-
+		elif (( $G_WHIP_RETURNED_VALUE == 4 ))
+		then
 			G_WHIP_MENU_ARRAY=(
-
 				'0' ': Disabled (default)'
 				'1' ': 90 degrees'
 				'2' ': 180 degrees'
@@ -409,8 +388,8 @@ A long (or insufficiently manufactured) cable may required a higher boost settin
 			fi
 			REBOOT_REQUIRED=1
 
-		elif (( $G_WHIP_RETURNED_VALUE == 5 )); then
-
+		elif (( $G_WHIP_RETURNED_VALUE == 5 ))
+		then
 			G_WHIP_MENU_ARRAY=(
 
 				'0' ': Disabled (default)'
@@ -418,18 +397,17 @@ A long (or insufficiently manufactured) cable may required a higher boost settin
 			)
 
 			G_WHIP_DEFAULT_ITEM=$rotation_lcd_current
-			if G_WHIP_MENU 'Please select an option:\n\nNB: This option is for RPi touchscreen.'; then
-
+			if G_WHIP_MENU 'Please select an option:\n\nNB: This option is for RPi touchscreen.'
+			then
 				G_CONFIG_INJECT 'lcd_rotate=' "lcd_rotate=$G_WHIP_RETURNED_VALUE" /boot/config.txt && REBOOT_REQUIRED=1
-
 			fi
 
-		elif (( $G_WHIP_RETURNED_VALUE == 14 )); then
-
+		elif (( $G_WHIP_RETURNED_VALUE == 14 ))
+		then
 			/boot/dietpi/dietpi-led_control
 
-		elif (( $G_WHIP_RETURNED_VALUE == 16 )); then
-
+		elif (( $G_WHIP_RETURNED_VALUE == 16 ))
+		then
 			# Find and obtain values for all backlight devices
 			local fp_brightness iTotalAvailable=0 aFp_Brightness_Available=() aBrightness_Name=() aBrightness_Current=() aBrightness_Max=()
 			for fp_brightness in /sys/class/backlight/*
@@ -495,10 +473,9 @@ A long (or insufficiently manufactured) cable may required a higher boost settin
 				Info_HW_OptionNotSupported
 			fi
 
-		elif (( $G_WHIP_RETURNED_VALUE == 17 )); then
-
+		elif (( $G_WHIP_RETURNED_VALUE == 17 ))
+		then
 			G_WHIP_MENU_ARRAY=(
-
 				'96' ': Default'
 				'120' ": +25% larger"
 				'144' ": +50% larger"
@@ -510,31 +487,28 @@ A long (or insufficiently manufactured) cable may required a higher boost settin
 			if G_WHIP_MENU "Please select a DPI value for Xorg:
  - A higher value will make text and windows larger
  - Has no effect on local terminal (eg: no desktop installed)
- \nNB: Setting will only take effect, once system is restarted."; then
-
+ \nNB: Setting will only take effect, once system is restarted."
+			then
 				G_CONFIG_INJECT 'SOFTWARE_XORG_DPI=' "SOFTWARE_XORG_DPI=$G_WHIP_RETURNED_VALUE" /boot/dietpi.txt
 				G_EXEC mkdir -p /etc/X11/Xsession.d
 				echo "xrandr --dpi $G_WHIP_RETURNED_VALUE" > /etc/X11/Xsession.d/99-dietpi-dpi
 				REBOOT_REQUIRED=1
-
 			fi
-
 		fi
 	}
 
 	# TARGETMENUID=2
-	Menu_DisplayOptions_Driver_Resolution(){
-
+	Menu_DisplayOptions_Driver_Resolution()
+	{
 		G_WHIP_BUTTON_CANCEL_TEXT='Cancel'
 
 		# VM
-		if (( $G_HW_MODEL == 20 )); then
-
+		if (( $G_HW_MODEL == 20 ))
+		then
 			local current=$(sed -n '/^[[:blank:]]*GRUB_GFXMODE=/{s/^[^=]*=//p;q}' /etc/default/grub)
 			[[ $current ]] || current='System default'
 
 			G_WHIP_MENU_ARRAY=(
-
 				'System default' ''
 				'1600x1200' ''
 				'1280x1024' ''
@@ -548,23 +522,20 @@ A long (or insufficiently manufactured) cable may required a higher boost settin
 \nNB: This only affects the virtual screen resolution, not the SSH session.
 	You might need to increase the maximum guest screen resolution within your VM software." || { Back_or_Exit 1; return 0; } # Display Options
 
-			if [[ $G_WHIP_RETURNED_VALUE == 'System default' ]]; then
-
+			if [[ $G_WHIP_RETURNED_VALUE == 'System default' ]]
+			then
 				sed --follow-symlinks -i 's/^[[:blank:]]*GRUB_GFXMODE=/#GRUB_GFXMODE=/' /etc/default/grub
 				sed --follow-symlinks -i 's/^[[:blank:]]*GRUB_GFXPAYLOAD_LINUX=/#GRUB_GFXPAYLOAD_LINUX=/' /etc/default/grub
-
 			else
-
 				G_CONFIG_INJECT 'GRUB_GFXMODE=' "GRUB_GFXMODE=$G_WHIP_RETURNED_VALUE" /etc/default/grub
 				G_CONFIG_INJECT 'GRUB_GFXPAYLOAD_LINUX=' 'GRUB_GFXPAYLOAD_LINUX=keep' /etc/default/grub 'GRUB_GFXMODE='
-
 			fi
 
 			update-grub
 
 		# Native PC
-		elif (( $G_HW_MODEL == 21 )); then
-
+		elif (( $G_HW_MODEL == 21 ))
+		then
 			local gpu_current=$(sed -n '/^[[:blank:]]*CONFIG_GPU_DRIVER=/{s/^[^=]*=//p;q}' /boot/dietpi.txt)
 			gpu_current=${gpu_current,,}
 			local driver_installed=()
@@ -597,7 +568,6 @@ A long (or insufficiently manufactured) cable may required a higher boost settin
 			fi
 
 			G_WHIP_MENU_ARRAY=(
-
 				'Nvidia' ": ${driver_installed[0]} | Proprietary GPU driver"
 				'Intel' ": ${driver_installed[1]} | Open-Source VA-API GPU drivers"
 				'AMD' ": ${driver_installed[2]} | Proprietary GPU driver"
@@ -626,25 +596,23 @@ A long (or insufficiently manufactured) cable may required a higher boost settin
 			fi
 
 		# RPi
-		elif (( $G_HW_MODEL < 10 )); then
-
+		elif (( $G_HW_MODEL < 10 ))
+		then
 			local framebuffer_x=$(grep -m1 '^[[:blank:]]*framebuffer_width=' /boot/config.txt || vcgencmd get_config framebuffer_width)
 			framebuffer_x=${framebuffer_x#*=}; framebuffer_x=${framebuffer_x:-0}
 			local framebuffer_y=$(grep -m1 '^[[:blank:]]*framebuffer_height=' /boot/config.txt || vcgencmd get_config framebuffer_height)
 			framebuffer_y=${framebuffer_y#*=}; framebuffer_y=${framebuffer_y:-0}
 			local current_value=$(sed -n '/^[[:blank:]]*dtoverlay=vc4-/{s/^[^=]*=//p;q}' /boot/config.txt) # OpenGL check 1st
-			if [[ ! $current_value ]]; then
-
+			if [[ ! $current_value ]]
+			then
 				# Framebuffer
 				current_value="$framebuffer_x X $framebuffer_y"
 
 				# Check for headless
 				grep -q '^[[:blank:]]*AUTO_SETUP_HEADLESS=1' /boot/dietpi.txt && current_value='Headless'
-
 			fi
 
 			G_WHIP_MENU_ARRAY=(
-
 				'vc4-kms-v3d' ': OpenGL | 1920 x 1080'
 				'vc4-fkms-v3d' ': OpenGL | 1920 x 1080'
 				'1080p' ': 1920 x 1080'
@@ -668,8 +636,8 @@ A long (or insufficiently manufactured) cable may required a higher boost settin
 			REBOOT_REQUIRED=1
 
 			# Enable headless if chosen, else always disable
-			if [[ $G_WHIP_RETURNED_VALUE == 'Headless' ]]; then
-
+			if [[ $G_WHIP_RETURNED_VALUE == 'Headless' ]]
+			then
 				G_WHIP_YESNO 'Using the Headless option will:
  - Disable HDMI and composite output
  - Disable the framebuffer
@@ -681,91 +649,42 @@ Re-enabling HDMI requires a reboot. If you need emergency HDMI output, edit the 
  - In dietpi.txt, set "AUTO_SETUP_HEADLESS=0".' || { REBOOT_REQUIRED=0; return; }
 
 				/boot/dietpi/func/dietpi-set_hardware headless 1
-
 			else
-
 				/boot/dietpi/func/dietpi-set_hardware headless 0
-
 			fi
 
 			# Disable composite if not chosen
-			if [[ $G_WHIP_RETURNED_VALUE != 'sdtv_mode'* ]]; then
-
+			if [[ $G_WHIP_RETURNED_VALUE != 'sdtv_mode'* ]]
+			then
 				sed --follow-symlinks -i '/sdtv_mode=/c\#sdtv_mode=0' /boot/config.txt
 				sed --follow-symlinks -i '/enable_tvout=/c\#enable_tvout=0' /boot/config.txt
-
 			fi
 
 			# Disable OpenGL if not chosen
 			[[ $G_WHIP_RETURNED_VALUE == 'vc4-'* ]] || /boot/dietpi/func/dietpi-set_hardware rpi-opengl disable
 
-			if [[ $G_WHIP_RETURNED_VALUE == 'vc4-'* ]]; then
-
+			if [[ $G_WHIP_RETURNED_VALUE == 'vc4-'* ]]
+			then
 				/boot/dietpi/func/dietpi-set_hardware rpi-opengl "$G_WHIP_RETURNED_VALUE"
 
-			elif [[ $G_WHIP_RETURNED_VALUE != 'Headless' ]]; then
-
+			elif [[ $G_WHIP_RETURNED_VALUE != 'Headless' ]]
+			then
 				case "$G_WHIP_RETURNED_VALUE" in
-
 					'sdtv_mode'*)
-
 						# Enable SDTV on RPi4, apply to all RPi to allow SD card switch
 						G_CONFIG_INJECT 'enable_tvout=' 'enable_tvout=1' /boot/config.txt
 						G_CONFIG_INJECT 'sdtv_mode=' "$G_WHIP_RETURNED_VALUE" /boot/config.txt
-						framebuffer_x=720
-						framebuffer_y=576
+						framebuffer_x=720 framebuffer_y=576
 					;;
-
-					'DietPi-CloudShell')
-
-						framebuffer_x=320
-						framebuffer_y=240
-					;;
-
-					'1080p')
-
-						framebuffer_x=1920
-						framebuffer_y=1080
-					;;
-
-					'720p')
-
-						framebuffer_x=1280
-						framebuffer_y=720
-					;;
-
-					'480p')
-
-						framebuffer_x=854
-						framebuffer_y=480
-					;;
-
-					'RPi Touchscreen')
-
-						framebuffer_x=800
-						framebuffer_y=480
-					;;
-
-					'PC1')
-
-						framebuffer_x=1024
-						framebuffer_y=768
-					;;
-
-					'PC2')
-
-						framebuffer_x=800
-						framebuffer_y=640
-					;;
-
-					'PC3')
-
-						framebuffer_x=640
-						framebuffer_y=480
-					;;
-
+					'DietPi-CloudShell') framebuffer_x=320 framebuffer_y=240;;
+					'1080p') framebuffer_x=1920 framebuffer_y=1080;;
+					'720p') framebuffer_x=1280 framebuffer_y=720;;
+					'480p') framebuffer_x=854 framebuffer_y=480;;
+					'RPi Touchscreen') framebuffer_x=800 framebuffer_y=480;;
+					'PC1') framebuffer_x=1024 framebuffer_y=768;;
+					'PC2') framebuffer_x=800 framebuffer_y=640;;
+					'PC3') framebuffer_x=640 framebuffer_y=480;;
 					*) :;;
-
 				esac
 
 				# Apply framebuffer size and Chromium autostart resolution
@@ -773,30 +692,22 @@ Re-enabling HDMI requires a reboot. If you need emergency HDMI output, edit the 
 				G_CONFIG_INJECT 'framebuffer_height=' "framebuffer_height=$framebuffer_y" /boot/config.txt
 				G_CONFIG_INJECT 'SOFTWARE_CHROMIUM_RES_X=' "SOFTWARE_CHROMIUM_RES_X=$framebuffer_x" /boot/dietpi.txt
 				G_CONFIG_INJECT 'SOFTWARE_CHROMIUM_RES_Y=' "SOFTWARE_CHROMIUM_RES_Y=$framebuffer_y" /boot/dietpi.txt
-
 			fi
 
 		# Odroid XU4
-		elif (( $G_HW_MODEL == 11 )); then
-
+		elif (( $G_HW_MODEL == 11 ))
+		then
 			# Get Current Values
 			local current_resolution=$(grep -Em1 'setenv[[:blank:]]+videoconfig[[:blank:]]' /boot/boot.ini)
-			if [[ $current_resolution == *'1920x1080'* ]]; then
-
-				current_resolution='1080p'
-
-			elif [[ $current_resolution == *'1280x720'* ]]; then
-
-				current_resolution='720p'
-
-			elif [[ $current_resolution == *'720x480'* ]]; then
-
-				current_resolution='480p'
-
-			fi
+			case $current_resolution in
+				*'1920x1080'*) current_resolution='1920x1080';;
+				*'1280x720'*) current_resolution='1280x720';;
+				*'720x480'*) current_resolution='720x480';;
+				*'1024x600'*) current_resolution='1024x600';;
+				*) :;;
+			esac
 
 			G_WHIP_MENU_ARRAY=(
-
 				'1920x1080' ': 1080p'
 				'1280x720' ': 720p'
 				'720x480' ': 480p'
@@ -805,8 +716,6 @@ Re-enabling HDMI requires a reboot. If you need emergency HDMI output, edit the 
 
 			G_WHIP_DEFAULT_ITEM=$current_resolution
 			G_WHIP_MENU "Hardware : $G_HW_MODEL_NAME\nCurrent: $current_resolution" || { Back_or_Exit 1; return 0; } # Display Options
-
-			REBOOT_REQUIRED=1
 
 			# DVI or HDMI
 			if [[ $G_WHIP_RETURNED_VALUE == '1024x600' ]]
@@ -818,56 +727,11 @@ Re-enabling HDMI requires a reboot. If you need emergency HDMI output, edit the 
 
 			G_CONFIG_INJECT 'setenv[[:blank:]]+videoconfig[[:blank:]]' "setenv videoconfig \"drm_kms_helper.edid_firmware=edid/$G_WHIP_RETURNED_VALUE.bin\"" /boot/boot.ini 'ODROIDXU-UBOOT-CONFIG'
 
-		# Odroid C2 legacy
-		elif [[ $G_HW_MODEL == 12 && -f '/boot/boot.ini' ]]; then
-
-			# Get Current Values
-			local current_resolution=$(mawk -F '"' '/setenv m "/{print $2;exit}' /boot/boot.ini | sed 's/p/p /')
-			# - NB: also added space after xxxp, so its easier to read, and selects default item.
-
-			G_WHIP_MENU_ARRAY=(
-
-				'2160p 60hz' ': 4K (Recommended)'
-				'2160p 50hz' ': 4K'
-				'2160p 30hz' ': 4K'
-				'2160p 25hz' ': 4K'
-				'2160p 24hz' ': 4K'
-				'1080p 60hz' ': 1080p (Recommended)'
-				'1080p 50hz' ': 1080p'
-				'1080p 24hz' ': 1080p'
-				'720p 60hz' ': 720p (Recommended)'
-				'720p 50hz' ': 720p'
-				'480p 60hz' ': 480p'
-				'1024x600p 60hz' ': VU7+'
-				'1024x768p 60hz' ': 4:3'
-				'800x600p 60hz' ': 4:3'
-			)
-
-			G_WHIP_DEFAULT_ITEM=$current_resolution
-			G_WHIP_MENU "Hardware : $G_HW_MODEL_NAME\nCurrent: $current_resolution" || { Back_or_Exit 1; return 0; } # Display Options
-
-			[[ $current_resolution != "$G_WHIP_RETURNED_VALUE" ]] && REBOOT_REQUIRED=1
-
-			# Always reset vga/dvi options
-			sed --follow-symlinks -Ei 's/^[[:blank:]]*(setenv[[:blank:]]+vout[[:blank:]].*$)/#\1/' /boot/boot.ini
-
-			# DVI / VU7+
-			if [[ $G_WHIP_RETURNED_VALUE == '1024x600p 60hz' ]]; then
-
-				# DVI mode
-				G_CONFIG_INJECT 'setenv[[:blank:]]+vout[[:blank:]]' 'setenv vout "dvi"' /boot/boot.ini 'ODROIDC2-UBOOT-CONFIG'
-
-			fi
-
-			# Remove the space from option
-			local temp_string=${G_WHIP_RETURNED_VALUE//[[:blank:]]/}
-
-			G_CONFIG_INJECT 'setenv[[:blank:]]+m[[:blank:]]' "setenv m \"$temp_string\"" /boot/boot.ini 'ODROIDC2-UBOOT-CONFIG'
+			REBOOT_REQUIRED=1
 		else
 			Info_HW_OptionNotSupported
 			Back_or_Exit 1 # Display Options
 		fi
-
 	}
 
 	# TARGETMENUID=19
@@ -945,7 +809,7 @@ Re-enabling HDMI requires a reboot. If you need emergency HDMI output, edit the 
 		G_WHIP_MENU_ARRAY=()
 
 		(( $G_HW_MODEL < 10 )) && G_WHIP_MENU_ARRAY+=('' '●─ Toggle console ')
-		for i in /dev/{tty{S,AMA,SAC,AML,SC,GS,FIQ,MV},hvc}[0-9]
+		for i in /dev/{tty{S,AMA,SAC,AML,SC,GS,FIQ,MV},hvc}[0-9]*
 		do
 			[[ -e $i ]] || continue
 			i=${i#/dev/}
@@ -1050,8 +914,8 @@ Re-enabling HDMI requires a reboot. If you need emergency HDMI output, edit the 
 		# Armbian U-Boot update
 		if [[ -f '/usr/lib/u-boot/platform_install.sh' ]]
 		then
-			local rootdev=$(lsblk -npo PKNAME "$G_ROOTFS_DEV")
-			G_WHIP_MENU_ARRAY+=('Update MMC bootloader' ": Flash current U-Boot to $rootdev")
+			local bootdev=$(lsblk -npo PKNAME "$(findmnt -Ufnro SOURCE -T /boot)")
+			G_WHIP_MENU_ARRAY+=('Update MMC bootloader' ": Flash current U-Boot to $bootdev")
 		fi
 
 		# RPi 4/5 EEPROM update: https://www.raspberrypi.org/documentation/hardware/raspberrypi/booteeprom.md
@@ -1068,11 +932,17 @@ Re-enabling HDMI requires a reboot. If you need emergency HDMI output, edit the 
 				G_WHIP_MENU_ARRAY+=('Update RPi EEPROM firmware' ': Install rpi-eeprom APT package')
 			fi
 
-		# ROCK 4, ROCK 5B and Orange Pi 5 (Plus): https://dietpi.com/forum/t/orange-pi-5-boot-from-nvme/16457
-		elif [[ $G_HW_MODEL =~ ^(72|78|80|82)$ ]]
+		# Odroid N2, ROCK 4, ROCK 5B, Orange Pi 5 (Plus) and Orange Pi 3B: https://dietpi.com/forum/t/orange-pi-5-boot-from-nvme/16457
+		elif [[ $G_HW_MODEL =~ ^(15|72|78|80|82|87)$ ]]
 		then
-			# ROCK 4: Device tree overlay required
-			(( $G_HW_MODEL == 72 )) || [[ -b '/dev/mtdblock0' && -f '/usr/lib/u-boot/platform_install.sh' ]] && G_WHIP_MENU_ARRAY+=('Update SPI bootloader' ': Flash current U-Boot to /dev/mtdblock0')
+			# Odroid N2/ROCK 4: Device tree overlay required
+			local spidev='/dev/mtdblock0'
+			(( $G_HW_MODEL == 15 || $G_HW_MODEL == 72 )) || {
+				[[ -f '/usr/lib/u-boot/platform_install.sh' ]] && {
+					{ [[ -e '/dev/mtd0' ]] && grep -q '/dev/mtd0' /usr/lib/u-boot/platform_install.sh && spidev='/dev/mtd0'; } ||
+					{ [[ -b '/dev/mtdblock0' ]] && grep -q '/dev/mtdblock0' /usr/lib/u-boot/platform_install.sh; }
+				}
+			} && G_WHIP_MENU_ARRAY+=('Update SPI bootloader' ": Flash current U-Boot to $spidev")
 
 		# VisionFive 2/Star64: https://doc-en.rvspace.org/VisionFive2/PDF/VisionFive2_QSG.pdf
 		elif (( $G_HW_MODEL == 81 || $G_HW_MODEL == 84 ))
@@ -1088,8 +958,8 @@ Re-enabling HDMI requires a reboot. If you need emergency HDMI output, edit the 
 		[[ -f '/etc/modprobe.d/dietpi-disable_bluetooth.conf' ]] && bluetooth_state=0 bluetooth_state_text='Off'
 		G_WHIP_MENU_ARRAY+=('Bluetooth' ": [$bluetooth_state_text]")
 
-		# Orange Pi Zero 3 specific
-		if (( $G_HW_MODEL == 83 ))
+		# Orange Pi Zero 3/Zero 2W specific
+		if (( $G_HW_MODEL == 83 || $G_HW_MODEL == 88 ))
 		then
 			# SPI state
 			local spi_enabled=$(grep -Ecm1 '^[[:blank:]]*overlays=(.*[[:blank:]])?spi1-cs1-spidev([[:blank:]]|$)' /boot/dietpiEnv.txt)
@@ -1208,31 +1078,47 @@ Further information: https://www.raspberrypi.org/documentation/hardware/raspberr
 		elif [[ $G_WHIP_RETURNED_VALUE == 'Update MMC bootloader' ]]; then
 
 			G_WHIP_YESNO "[ INFO ] MMC bootloader update
-\nThis will flash the U-Boot image of the installed linux-u-boot-* package to the MMC device $rootdev.
+\nThis will flash the U-Boot image of the installed linux-u-boot-* package to the MMC device $bootdev.
 \nDo you want to continue?" || return 0
-			# shellcheck disable=SC1091
-			. /usr/lib/u-boot/platform_install.sh
-			# Do not mute progress and error messages
-			eval "$(declare -f write_uboot_platform | sed -e 's| > /dev/null 2>&1||g' -e 's|status=none|status=progress|g')"
-			# shellcheck disable=SC2154
-			write_uboot_platform "$DIR" "$rootdev"
+			/boot/dietpi/func/dietpi-set_hardware flash-u-boot-mmc "$bootdev"
 
 		elif [[ $G_WHIP_RETURNED_VALUE == 'Update SPI bootloader' ]]; then
 
-			if [[ $G_HW_MODEL == 72 && ! -b '/dev/mtdblock0' ]]
+			if [[ $G_HW_MODEL == 15 && ! -b '/dev/mtdblock0' ]]
+			then
+				local overlays=() i=
+				read -ra overlays < <(mawk -F= '$1=="overlays"{$1="";print}' /boot/dietpiEnv.txt)
+				for i in "${overlays[@]}"; do [[ $i == 'g12b-odroid-n2-spi' ]] && break; done
+				if [[ $i == 'g12b-odroid-n2-spi' ]]
+				then
+					G_WHIP_MSG '[FAILED] No SPI device found
+\nThe expected SPI device /dev/mtdblock0 was not found on your Odroid N2 system, despite the fact that the related device tree overlay has been applied already. You may need to reboot for the change to take effect.
+\nIn case, reboot the system before selecting this menu option again. If you did so, please report this issue on our forum or GitHub page.'
+					return 1
+				else
+					G_WHIP_YESNO '[ INFO ] Device tree overlay required
+\nA kernel device tree overlay is required to access the SPI device on the Odroid N2.
+\nShall we add the overlay for you? A reboot will be required for the change to take effect, after which you can reselect this menu option.' || return 0
+					overlays+=('g12b-odroid-n2-spi')
+					G_CONFIG_INJECT 'overlays=' "overlays=${overlays[*]}" /boot/dietpiEnv.txt
+					REBOOT_REQUIRED=1
+					return 0
+				fi
+
+			elif [[ $G_HW_MODEL == 72 && ! -b '/dev/mtdblock0' ]]
 			then
 				local overlays=() i=
 				read -ra overlays < <(mawk -F= '$1=="overlays"{$1="";print}' /boot/dietpiEnv.txt)
 				for i in "${overlays[@]}"; do [[ $i == 'spi-jedec-nor' ]] && break; done
 				if [[ $i == 'spi-jedec-nor' ]]
 				then
-					G_WHIP_MSG '[FAILED] No MTD device found
-\nThe expected MTD device /dev/mtdblock0 was not found on your ROCK 4 system, despite the fact that the related device tree overlay has been applied already. You may either have a model which has no onboard SPI storage, or you did not reboot yet for the change to take effect.
-\nIn case reboot the system before selecting this menu option again, otherwise check back whether your ROCK 4 variant is really supposed to have an SPI storge.'
+					G_WHIP_MSG '[FAILED] No SPI device found
+\nThe expected SPI device /dev/mtdblock0 was not found on your ROCK 4 system, despite the fact that the related device tree overlay has been applied already. You may either have a model which has no onboard SPI storage, or you did not reboot yet for the change to take effect.
+\nIn case, reboot the system before selecting this menu option again, otherwise check back whether your ROCK 4 variant is really supposed to have an SPI storge.'
 					return 1
 				else
-					G_WHIP_YESNO '[ INFO ] No MTD device found
-\nThe expected MTD device /dev/mtdblock0 was not found on your ROCK 4 system. You may either have a model which has no onboard SPI storage, or a device tree overlay may be required to make the MTD device available.
+					G_WHIP_YESNO '[ INFO ] No SPI device found
+\nThe expected SPI device /dev/mtdblock0 was not found on your ROCK 4 system. You may either have a model which has no onboard SPI storage, or a device tree overlay may be required to make the SPI device available.
 \nShall we add the overlay for you? A reboot will be required for the change to take effect, after which you can reselect this menu option.' || return 0
 					overlays+=('spi-jedec-nor')
 					G_CONFIG_INJECT 'overlays=' "overlays=${overlays[*]}" /boot/dietpiEnv.txt
@@ -1240,15 +1126,24 @@ Further information: https://www.raspberrypi.org/documentation/hardware/raspberr
 					REBOOT_REQUIRED=1
 					return 0
 				fi
-			fi
-			G_WHIP_YESNO '[ INFO ] SPI bootloader update
+
+			elif [[ $spidev == '/dev/mtd0' ]]
+			then
+				G_WHIP_YESNO '[ INFO ] SPI bootloader update
+\nThis will flash the U-Boot image of the installed linux-u-boot-* package to the SPI device /dev/mtd0.
+\nDo you want to continue?' || return 0
+				G_AG_CHECK_INSTALL_PREREQ mtd-utils
+			else
+				G_WHIP_YESNO '[ INFO ] SPI bootloader update
 \nThis will flash the U-Boot image of the installed linux-u-boot-* package to the SPI device /dev/mtdblock0.
 \nDo you want to continue?' || return 0
+			fi
+
 			# shellcheck disable=SC1091
 			. /usr/lib/u-boot/platform_install.sh
-			[[ -f $DIR/rkspi_loader.img ]] || { G_WHIP_MSG "[FAILED] SPI U-Boot image missing\n\nThe expected U-Boot image at $DIR/rkspi_loader.img could not be found. Please report this to our GitHub or forum, so we can check back and in case update this dietpi-config option."; return 1; }
+			eval "$(declare -f write_uboot_platform_mtd | sed -e 's| > /dev/null 2>&1||g' -e 's|status=none|status=progress|g' -e 's/^[[:blank:]]*dd /dd oflag=direct conv=notrunc status=progress /')"
 			# shellcheck disable=SC2154
-			G_EXEC_OUTPUT=1 G_EXEC dd if="$DIR/rkspi_loader.img" of=/dev/mtdblock0 oflag=direct conv=notrunc status=progress
+			write_uboot_platform_mtd "$DIR"
 
 		elif [[ $G_WHIP_RETURNED_VALUE == 'Update bootloader' ]]; then
 
@@ -1714,79 +1609,30 @@ If unsure, set any value, 'Ondemand Down Factor' option on the next screen will 
 	# TARGETMENUID=6
 	Menu_GpumemoryOptions()
 	{
+		# Get current memory split
+		# - Get override setting: gpu_mem_1024 is effective for all models with >= 1 GiB RAM
+		local size=1024 default=76
+		(( $G_HW_MEMORY_SIZE < 1024 )) && size=$G_HW_MEMORY_SIZE default=64
+		local gpu_mem_current=$(sed -n "/^[[:blank:]]*gpu_mem_$size=/{s/^[^=]*=//p;q}" /boot/config.txt) # override setting
+		[[ $gpu_mem_current ]] || gpu_mem_current=$(sed -n "/^[[:blank:]]*gpu_mem=/{s/^[^=]*=//p;q}" /boot/config.txt) # base setting
+		[[ $gpu_mem_current ]] || gpu_mem_current=$default # default value
+		local ram_mem_current=$((G_HW_MEMORY_SIZE-gpu_mem_current))
+
+		# Create array for storing menu selectable options.
+		G_WHIP_MENU_ARRAY=(
+
+			16 ': Server/Console/Headless'
+			32 ': Minimal GUI'
+			"$default" ': Full GUI/Desktop/Default'
+			96 ': Camera/Legacy GPU'
+		)
+
 		G_WHIP_BUTTON_CANCEL_TEXT='Cancel'
+		G_WHIP_DEFAULT_ITEM=$gpu_mem_current
+		G_WHIP_MENU "GPU/RAM memory splits are pre-configured and optimized by DietPi-Software based on your software installs. However, feel free to tweak them.
+\nCurrent: $gpu_mem_current MiB GPU | $ram_mem_current MiB RAM" || { Back_or_Exit 1; return 0; } # Display Options
 
-		# RPi
-		if (( $G_HW_MODEL < 10 )); then
-
-			# Get current memory split
-			# - Get override setting: gpu_mem_1024 is effective for all models with >= 1 GiB
-			local value=1024
-			(( $value < 1024 )) && value=$G_HW_MEMORY_SIZE
-			local gpu_mem_current=$(sed -n "/^[[:blank:]]*gpu_mem_$value=/{s/^[^=]*=//p;q}" /boot/config.txt) # override setting
-			[[ $gpu_mem_current ]] || gpu_mem_current=$(sed -n "/^[[:blank:]]*gpu_mem=/{s/^[^=]*=//p;q}" /boot/config.txt) # base setting
-			[[ $gpu_mem_current ]] || { (( $value < 1024 )) && gpu_mem_current=64 || gpu_mem_current=76; } # default value
-			local ram_mem_current=$((G_HW_MEMORY_SIZE-gpu_mem_current))
-
-			# Create array for storing menu selectable options.
-			G_WHIP_MENU_ARRAY=(
-
-				16 ': Server'
-				64 ': Desktop'
-				96 ': Camera'
-				128 ': Gaming'
-			)
-
-			if (( $G_HW_MEMORY_SIZE >= 512 )); then
-
-				G_WHIP_MENU_ARRAY+=(192 '')
-				G_WHIP_MENU_ARRAY+=(256 ': Video de/encoding')
-
-				if (( $G_HW_MEMORY_SIZE >= 1024 )); then
-
-					G_WHIP_MENU_ARRAY+=(384 '')
-					G_WHIP_MENU_ARRAY+=(512 ': You are insane!')
-
-				fi
-
-			fi
-
-			G_WHIP_DEFAULT_ITEM=$gpu_mem_current
-			G_WHIP_MENU "Hardware : $G_HW_MODEL_NAME\nCurrent: $gpu_mem_current MiB GPU | $ram_mem_current MiB RAM" || { Back_or_Exit 1; return 0; } # Display Options
-
-			/boot/dietpi/func/dietpi-set_hardware gpumemsplit "$G_WHIP_RETURNED_VALUE" && REBOOT_REQUIRED=1
-
-		# Odroid C2 legacy
-		elif [[ $G_HW_MODEL == 12 && -f '/boot/boot.ini' ]]; then
-
-			# Get current memory split
-			local ram_mem_current=$(free -m | mawk '/Mem:/{print $2;exit}')
-			local gpu_mem_current=$((2048-ram_mem_current))
-
-			# HDMI/headless extra data
-			local display_output_enabled=$(grep -Ecm1 '^[[:blank:]]*setenv[[:blank:]]+nographics[[:blank:]]+"0"' /boot/boot.ini)
-			local display_output_text='On'
-			(( $display_output_enabled )) || display_output_text='Off'
-
-			G_WHIP_MENU_ARRAY=(
-
-				'Headless' ': HDMI: Disabled | VPU: Disabled | +300 MiB RAM'
-				'Default' ': HDMI: Enabled  | VPU: Enabled | -300 MiB RAM'
-			)
-
-			G_WHIP_MENU "Hardware : $G_HW_MODEL_NAME\nCurrent  : HDMI: [$display_output_text] | VPU: [$display_output_text]\nMemory   : $gpu_mem_current MiB GPU | $ram_mem_current MiB RAM\nNB: GPU/RAM figures require a reboot after a change is made." || { Back_or_Exit 1; return 0; } # Display Options
-
-			case $G_WHIP_RETURNED_VALUE in
-
-				'Headless') /boot/dietpi/func/dietpi-set_hardware headless 1 && REBOOT_REQUIRED=1;;
-				'Default') /boot/dietpi/func/dietpi-set_hardware headless 0 && REBOOT_REQUIRED=1;;
-				*) G_DIETPI-NOTIFY 1 'An invalid "case" option was used. This is a bug, please report at: https://github.com/MichaIng/DietPi/issues'; exit 1;;
-			esac
-
-		else
-			Info_HW_OptionNotSupported
-			Back_or_Exit 1 # Display Options
-		fi
+		/boot/dietpi/func/dietpi-set_hardware gpumemsplit "$G_WHIP_RETURNED_VALUE" && REBOOT_REQUIRED=1
 	}
 
 	# TARGETMENUID=7
@@ -1842,7 +1688,7 @@ If unsure, set any value, 'Ondemand Down Factor' option on the next screen will 
 	NET_RX_MB='N/A'
 	NET_TX_MB='N/A'
 
-	# $1 = device+index
+	# $1 = interface
 	Net_Update_UsageStats()
 	{
 		local input=$1
@@ -1899,7 +1745,7 @@ If unsure, set any value, 'Ondemand Down Factor' option on the next screen will 
 	Network_ETH_CopyCurrentToStatic()
 	{
 		# Apply if we have a connection
-		(( $ETH_CONNECTED )) || return
+		(( $ETH_CONNECTED )) || return 0
 
 		ETH_IP_STATIC=$ETH_IP
 		ETH_GATEWAY_STATIC=$ETH_GATEWAY
@@ -1910,7 +1756,7 @@ If unsure, set any value, 'Ondemand Down Factor' option on the next screen will 
 	Network_WIFI_CopyCurrentToStatic()
 	{
 		# Apply if we have a connection
-		(( $WIFI_CONNECTED )) || return
+		(( $WIFI_CONNECTED )) || return 0
 
 		WIFI_IP_STATIC=$WIFI_IP
 		WIFI_GATEWAY_STATIC=$WIFI_GATEWAY
@@ -1970,20 +1816,18 @@ If unsure, set any value, 'Ondemand Down Factor' option on the next screen will 
 		# Check if resolvconf is available, else apply static DNS server via /etc/resolv.conf directly instead of /etc/network/interfaces entry
 		local i resolvconf=0
 		command -v resolvconf > /dev/null && resolvconf=1
-		if (( ! $resolvconf )); then
-
-			if (( ! $ETH_DISABLED && $ETH_MODE_TARGET == 0 )); then
-
+		if (( ! $resolvconf ))
+		then
+			if (( ! $ETH_DISABLED && $ETH_MODE_TARGET == 0 ))
+			then
 				> /etc/resolv.conf
 				for i in $ETH_DNS_STATIC; do echo "nameserver $i" >> /etc/resolv.conf; done
 
-			elif (( ! $WIFI_DISABLED && $WIFI_MODE_TARGET == 0 )); then
-
+			elif (( ! $WIFI_DISABLED && $WIFI_MODE_TARGET == 0 ))
+			then
 				> /etc/resolv.conf
 				for i in $WIFI_DNS_STATIC; do echo "nameserver $i" >> /etc/resolv.conf; done
-
 			fi
-
 		fi
 
 		# Eth
@@ -2081,67 +1925,72 @@ _EOF_
 		Network_Restart
 	}
 
+	# $1: Adapter type | 0=Eth, 1=WiFi
 	Change_StaticIp()
 	{
 		# Ethernet
-		if (( $1 == 0 )); then
-
+		if (( ! $1 ))
+		then
 			G_WHIP_DEFAULT_ITEM=$ETH_IP_STATIC
 			G_WHIP_INPUTBOX 'Please enter a new static Ethernet IP address:' && ETH_IP_STATIC=$G_WHIP_RETURNED_VALUE
 
 		# WiFi
-		elif (( $1 == 1 )); then
-
+		else
 			G_WHIP_DEFAULT_ITEM=$WIFI_IP_STATIC
 			G_WHIP_INPUTBOX 'Please enter a new static WiFi IP address:' && WIFI_IP_STATIC=$G_WHIP_RETURNED_VALUE
-
 		fi
 	}
 
+	# $1: Adapter type | 0=Eth, 1=WiFi
 	Change_StaticGateway()
 	{
 		# Ethernet
-		if (( $1 == 0 )); then
-
+		if (( ! $1 ))
+		then
 			G_WHIP_DEFAULT_ITEM=$ETH_GATEWAY_STATIC
 			G_WHIP_INPUTBOX 'Please enter a new static Ethernet gateway address:' && ETH_GATEWAY_STATIC=$G_WHIP_RETURNED_VALUE
 
 		# WiFi
-		elif (( $1 == 1 )); then
-
+		else
 			G_WHIP_DEFAULT_ITEM=$WIFI_GATEWAY_STATIC
 			G_WHIP_INPUTBOX 'Please enter a new static WiFi gateway address:' && WIFI_GATEWAY_STATIC=$G_WHIP_RETURNED_VALUE
-
 		fi
 	}
 
+	# $1: Adapter type | 0=Eth, 1=WiFi
 	Change_StaticMask()
 	{
 		# Ethernet
-		if (( $1 == 0 )); then
-
+		if (( ! $1 ))
+		then
 			G_WHIP_DEFAULT_ITEM=$ETH_MASK_STATIC
 			G_WHIP_INPUTBOX 'Please enter a new static Ethernet network mask:' && ETH_MASK_STATIC=$G_WHIP_RETURNED_VALUE
 
 		# WiFi
-		elif (( $1 == 1 )); then
-
+		else
 			G_WHIP_DEFAULT_ITEM=$WIFI_MASK_STATIC
 			G_WHIP_INPUTBOX 'Please enter a new static WiFi network mask:' && WIFI_MASK_STATIC=$G_WHIP_RETURNED_VALUE
-
 		fi
 	}
 
+	# $1: Adapter type | 0=Eth, 1=WiFi
 	Change_StaticDns()
 	{
-		# $1 = Adapater type | 0=Eth, 1=WiFi
-
 		# Current value => default choice
 		(( $1 )) && G_WHIP_DEFAULT_ITEM=$WIFI_DNS_STATIC || G_WHIP_DEFAULT_ITEM=$ETH_DNS_STATIC
+		G_WHIP_MENU_ARRAY=("$G_WHIP_DEFAULT_ITEM" ': Your current DNS server')
 
-		G_WHIP_MENU_ARRAY=(
+		# Auto detect local gateway(s)/router(s) to offer as DNS server(s).
+		local gateway=$(ip r l 0/0 | mawk '{print $3}' ORS=' ')
+		while [[ $gateway == *' '*' '* ]]; do gateway=${gateway% *}; done
+		[[ $gateway ]] && G_WHIP_MENU_ARRAY+=("$gateway" ': Use local router as DNS server (recommended)')
 
+		# Auto detect local DNS resolver to offer as system DNS
+		ss -uln | grep -q ':53[[:blank:]]' && G_WHIP_MENU_ARRAY+=('127.0.0.1' ': Use local Pi-hole/AdGuard Home/Unbound (not recommended)')
+
+		G_WHIP_MENU_ARRAY+=(
 			'Custom' ': Manually enter your DNS server'
+			'' '●─ Public DNS providers '
 			'1.1.1.1 1.0.0.1' ': Cloudflare'
 			'9.9.9.9 149.112.112.112' ': Quad9'
 			'8.8.8.8 8.8.4.4' ': Google'
@@ -2153,12 +2002,14 @@ _EOF_
 			'84.200.69.80 84.200.70.40' ': DNS.WATCH'
 		)
 
-		G_WHIP_MENU 'Please select a DNS server, or choose "Custom" for manual entry:' || return
-		if [[ $G_WHIP_RETURNED_VALUE == 'Custom' ]]; then
+		G_WHIP_MENU 'Please select a DNS server, or choose "Custom" for manual entry:' || return 0
 
+		if [[ $G_WHIP_RETURNED_VALUE == 'Custom' ]]
+		then
 			(( $1 )) && G_WHIP_DEFAULT_ITEM=$WIFI_DNS_STATIC || G_WHIP_DEFAULT_ITEM=$ETH_DNS_STATIC
-			G_WHIP_INPUTBOX 'Please enter a new DNS server address\n - 2 maximum, seperated by a space.\n - E.g.: 9.9.9.9 149.112.112.112' || return
-
+			G_WHIP_INPUTBOX "Please enter one or two space-separated DNS server addresses
+ - E.g.:    9.9.9.9 149.112.112.112
+ - Current: $G_WHIP_DEFAULT_ITEM" || return 0
 		fi
 
 		# Apply new value
@@ -2416,20 +2267,16 @@ NB: All Ethernet connections will be temporarily dropped!' && Network_ApplyChang
 
 		# Onboard WiFi
 		# - RPi 3/4/Zero W
-		if (( $G_HW_ONBOARD_WIFI )); then
-
+		if (( $G_HW_ONBOARD_WIFI ))
+		then
 			local onboard_wifi_enabled=1
-			if grep -q '^[[:blank:]]*dtoverlay=disable-wifi' /boot/config.txt; then
-
+			if grep -q '^[[:blank:]]*dtoverlay=disable-wifi' /boot/config.txt
+			then
 				onboard_wifi_enabled=0
 				G_WHIP_MENU_ARRAY+=('Onboard WiFi' ': [Off]')
-
 			else
-
 				G_WHIP_MENU_ARRAY+=('Onboard WiFi' ': [On]')
-
 			fi
-
 		fi
 
 		G_WHIP_MENU_ARRAY+=('' '●─ Additional Options ')
@@ -2467,12 +2314,22 @@ NB: All Ethernet connections will be temporarily dropped!' && Network_ApplyChang
 
 			'Ethernet')
 
-				# No adapter detected
+				# No adapter detected: Offer to disable if enabled
 				if (( ! $ETH_HARDWARE ))
 				then
+					if (( ! $ETH_DISABLED ))
+					then
+						if G_WHIP_YESNO 'No Ethernet adapter was detected on your device.
+\nWould you like to disable Ethernet?\n - NB: Connections may drop!'
+						then
+							ETH_DISABLED=1
+							Network_ApplyChanges
+						fi
+						return 0
+					fi
 					G_WHIP_MSG 'No Ethernet adapter was detected on your device.'
 
-				# Disabled: Offer chance to enable
+				# Disabled: Offer to enable
 				elif (( $ETH_DISABLED ))
 				then
 					if G_WHIP_YESNO 'Ethernet must be enabled before settings can be changed.
@@ -2489,7 +2346,7 @@ NB: All Ethernet connections will be temporarily dropped!' && Network_ApplyChang
 
 			'WiFi')
 
-				# Disabled: Offer chance to enable (also enables WiFi modules)
+				# Disabled: Offer to enable, including WiFi modules for adapter to be detected
 				if (( $WIFI_DISABLED ))
 				then
 					if G_WHIP_YESNO 'WiFi must be enabled before settings can be changed.
@@ -2497,11 +2354,11 @@ NB: All Ethernet connections will be temporarily dropped!' && Network_ApplyChang
 					then
 						WIFI_DISABLED=0
 						Network_ApplyChanges
-						# Enter submenu if a WiFi adapters has been detected, else only preselect the menu entry
+						# Enter submenu if WiFi adapter has been detected, else only preselect the menu entry
 						(( $WIFI_HARDWARE )) && TARGETMENUID=10 || G_WHIP_DEFAULT_ITEM='WiFi' # WiFi adapter menu
 					fi
 
-				# No adapter detected
+				# No adapter detected: Offer to disable
 				elif (( ! $WIFI_HARDWARE ))
 				then
 					if G_WHIP_YESNO 'No WiFi adapter was detected on your device.
@@ -2553,14 +2410,13 @@ NB: All Ethernet connections will be temporarily dropped!' && Network_ApplyChang
 		G_WHIP_MENU_ARRAY+=('Change Mode' ": [$mode_text]")
 
 		# Show static options
-		if (( $ETH_MODE_TARGET == 0 )); then
-
+		if (( $ETH_MODE_TARGET == 0 ))
+		then
 			G_WHIP_MENU_ARRAY+=('Copy' ': Copy current address to "Static"')
 			G_WHIP_MENU_ARRAY+=('Static IP' ": [$ETH_IP_STATIC]")
 			G_WHIP_MENU_ARRAY+=('Static Mask' ": [$ETH_MASK_STATIC]")
 			G_WHIP_MENU_ARRAY+=('Static Gateway' ": [$ETH_GATEWAY_STATIC]")
 			G_WHIP_MENU_ARRAY+=('Static DNS' ": [$ETH_DNS_STATIC]")
-
 		fi
 
 		G_WHIP_MENU_ARRAY+=('' '●─ Additional Options ')
@@ -3864,23 +3720,23 @@ Additional benchmarks:
 					if (( $G_RASPBIAN ))
 					then
 						local mirror_list='https://www.raspbian.org/RaspbianMirrors/'
-						G_WHIP_MENU_ARRAY+=('http://raspbian.raspberrypi.org/raspbian/' ': Global mirror director (default)')
-						G_WHIP_MENU_ARRAY+=('https://mirror.ox.ac.uk/sites/archive.raspbian.org/archive/raspbian/' ': UK')
-						G_WHIP_MENU_ARRAY+=('https://mirror.netcologne.de/raspbian/raspbian/' ': Germany')
-						G_WHIP_MENU_ARRAY+=('https://mirror.umd.edu/raspbian/raspbian/' ': USA')
-						G_WHIP_MENU_ARRAY+=('https://mirrors.ustc.edu.cn/raspbian/raspbian/' ': China')
-						G_WHIP_MENU_ARRAY+=('http://raspbian.mirror.digitalpacific.com.au/raspbian/' ': Australia')
+						G_WHIP_MENU_ARRAY+=('http://raspbian.raspberrypi.org/raspbian' ': Global mirror director (default)')
+						G_WHIP_MENU_ARRAY+=('https://mirror.ox.ac.uk/sites/archive.raspbian.org/archive/raspbian' ': UK')
+						G_WHIP_MENU_ARRAY+=('https://mirror.netcologne.de/raspbian/raspbian' ': Germany')
+						G_WHIP_MENU_ARRAY+=('https://mirror.umd.edu/raspbian/raspbian' ': USA')
+						G_WHIP_MENU_ARRAY+=('https://mirrors.ustc.edu.cn/raspbian/raspbian' ': China')
+						G_WHIP_MENU_ARRAY+=('http://raspbian.mirror.digitalpacific.com.au/raspbian' ': Australia')
 
 					# Debian
 					else
 						local mirror_list='https://www.debian.org/mirror/list'
-						G_WHIP_MENU_ARRAY+=('https://deb.debian.org/debian/' ': Global mirror director (default)')
-						G_WHIP_MENU_ARRAY+=('https://ftp.debian.org/debian/' ': Global')
-						G_WHIP_MENU_ARRAY+=('http://ftp.uk.debian.org/debian/' ': UK')
-						G_WHIP_MENU_ARRAY+=('http://ftp.de.debian.org/debian/' ': Germany')
-						G_WHIP_MENU_ARRAY+=('http://ftp.us.debian.org/debian/' ': USA')
-						G_WHIP_MENU_ARRAY+=('http://ftp.cn.debian.org/debian/' ': China')
-						G_WHIP_MENU_ARRAY+=('http://ftp.au.debian.org/debian/' ': Australia')
+						G_WHIP_MENU_ARRAY+=('https://deb.debian.org/debian' ': Global mirror director (default)')
+						G_WHIP_MENU_ARRAY+=('https://ftp.debian.org/debian' ': Global')
+						G_WHIP_MENU_ARRAY+=('http://ftp.uk.debian.org/debian' ': UK')
+						G_WHIP_MENU_ARRAY+=('http://ftp.de.debian.org/debian' ': Germany')
+						G_WHIP_MENU_ARRAY+=('http://ftp.us.debian.org/debian' ': USA')
+						G_WHIP_MENU_ARRAY+=('http://ftp.cn.debian.org/debian' ': China')
+						G_WHIP_MENU_ARRAY+=('http://ftp.au.debian.org/debian' ': Australia')
 					fi
 
 					G_WHIP_DEFAULT_ITEM=$apt_mirror_current
@@ -3889,7 +3745,7 @@ Additional benchmarks:
 					if [[ $G_WHIP_RETURNED_VALUE == 'Custom' ]]
 					then
 						G_WHIP_DEFAULT_ITEM=$apt_mirror_current
-						G_WHIP_INPUTBOX 'Please enter a new APT mirror, e.g. https://ftp.debian.org/debian/' || continue
+						G_WHIP_INPUTBOX 'Please enter a new APT mirror, e.g. https://ftp.debian.org/debian' || continue
 					fi
 
 					/boot/dietpi/func/dietpi-set_software apt-mirror "$G_WHIP_RETURNED_VALUE" || { failure='[FAILED] An internal error occurred, please report this issue to:\n - https://github.com/MichaIng/DietPi/issues\n\n'; continue; }

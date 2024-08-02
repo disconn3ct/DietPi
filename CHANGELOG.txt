@@ -1,17 +1,124 @@
-v9.3
-(2024-04-13)
-
-New images:
+v9.7
+(2024-08-03)
 
 Enhancements:
-- DietPi-Config | Removed the 3.5mm audio option on Raspberry Pi 5, as it does not have a 3.5mm jack. Additionally, the KMS graphics driver is enabled OOTB when HDMI audio is selected, as the snd_bcm2835 driver does not work on Raspberry Pi 5. Many thanks to @JRK0469 for making us aware of this: https://dietpi.com/forum/t/19760
+- Odroid N2 | Added an option to update (flash) the SPI bootloader to the dietpi-config "Advanced Options" menu.
+
+Bug fixes:
+- DietPi-Software | Box86/Box64: Resolved an issue where the installation failed because of a false directory removal attempt. Many thanks to @lukaszsobala for fixing this issue: https://github.com/MichaIng/DietPi/pull/7149
+- DietPi-Software | Bazarr: Resolved an issue where service stops and restarts were hanging until timeout, leading also to hanging system shutdowns and restarts. Many thansk to @clarky000 and @blablazzz for reporting this issue, and @gregordinary for pointing us to the solution: https://dietpi.com/forum/t/19610
+- DietPi-Software | WiFi Hotspot: Resolved an issue where the hotspot failed because of an unintended character in the interface configuration. Many thanks to @wimduk for reporting this issue: https://dietpi.com/forum/t/20744
+
+As always, many smaller code performance and stability improvements, visual and spelling fixes have been done, too much to list all of them here. Check out all code changes of this release on GitHub: https://github.com/MichaIng/DietPi/pull/ADDME
+
+-----------------------------------------------------------------------------------------------------------
+
+v9.6
+(2024-07-07)
+
+New software:
+- soju | This IRC bouncer has been added to our software catalogue. Many thanks to @subnut for implementing it: https://github.com/MichaIng/DietPi/pull/7124
+
+Enhancements:
+- General | Since we provide all kernel, bootloader and firmware packages from our own APT repository now, the Armbian APT repository is removed from all systems. In case you use an SBC which is not officially supported by DietPi, as generic device, it is however preserved.
+- Quartz64/Star64/VisionFive 2 | The extended attribute handler for ext4 security labels "CONFIG_EXT4_FS_SECURITY" has been enabled for these SBCs, required for some Docker containers. Many thanks to @gxsw for reporting this missing feature: https://github.com/MichaIng/DietPi/issues/7102
+- Quartz64/Star64/VisionFive 2 | eBPF functionality for firewall and network monitoring software like Cilium has been added to our kernel builds for these SBCs. Many thanks to @kbrighton for reporting these missing features: https://github.com/MichaIng/DietPi/issues/6834
+- Orange Pi 5 | Older U-Boot builds caused the Ethernet MAC address to be random and change on every boot. Recent U-Boot builds solve this, but they are not flashed automatically on package upgrades. We hence inform users and offer to flash the latest U-Boot image during the DietPi update. Many thanks to @thuehlinger for reporting and testing the case: https://github.com/MichaIng/DietPi/issues/6663
+- DietPi-Config | Legacy Odroid C2 resolution and GPU memory options have been removed.
+- DietPi-Config | The static DNS server menu now contains entries to select the default gateway/router or locally running DNS resolver (Pi-hole, AdGuard Home, Unbound, systemd-resolvd, ...), if detected.
+
+Bug fixes:
+- Network | Resolved a rare issue, where shutdowns could hang, when networking.service and ifup@.service instances try to bring down the same network interface concurrently. Many thanks to @ioctl2 for reporting this issue: https://github.com/MichaIng/DietPi/issues/7104
+- Odroid C1 | Resolved an issue, where the kernel upgrade did not apply as intended. Many thanks to @th2j for reporting this issue: https://github.com/MichaIng/DietPi/issues/6332#issuecomment-2162959873
+- VisionFive 2 | Resolved an issue where our new image did not boot, because of a false device tree name in /boot/extlinux/extlinux.conf.
+- NanoPi R6C | Resolved an issue where our new images did not boot, since the latest mainline U-Boot for R6S does not support the R6C anymore. Many thanks to @labmaster for reporting this issue: https://github.com/MichaIng/DietPi/issues/7109
+- DietPi-Banner | Resolved an issue where incorrect RAM usage was printed with German and potentially other locales. Many thanks to @jwgn for reporting this issue: https://github.com/MichaIng/DietPi/issues/7107
+- DietPi-Banner | Resolved an issue where logins as non-root user printed "No certificate found" if the Let's Encrypt cert status option was enabled, since non-root users have no permission to see the certificate files. In such cases, sudo is now used automatically, if the user has NOPASSWD permissions, else a meaningful info is shown. Many thanks to @FrapiFrance for implementing this fix: https://github.com/MichaIng/DietPi/pull/7121
+- DietPi-Drive_Manager | Resolved an issue, where network drives and potentially mounts in general could be attempted to be unmounted on shutdown, before services which can access them are stopped, leading to hanging shutdown sequences and potentially even data loss. Many thanks to @polite-garlic for reporting this issue: https://dietpi.com/forum/t/20542
+- DietPi-Dashboard | Resolved an issue where the installation on RISC-V systems failed.
+- DietPi-Software | Node-RED: Resolved an issue where reinstalls/updates failed because of incompatibilities between latest Node.js or global modules with older local instances. Many thanks to @thinkbig1979 for reporting this issue: https://github.com/MichaIng/DietPi/issues/7128
+- DietPi-Software | Fail2Ban: Resolved an issue on Debian Bookworm and above, where Dropbear login failures were not detected due to a non-matching default filter. Dropbear runs as native systemd unit since Bookworm, logging to the system journal via STDOUT, which results in a different log entry prefix. The default filter however has not been updated for this. The fix is as well applied to existing Fail2Ban installs, as long as no own override /etc/fail2ban/filter.d/dropbear.local has been created. Many thanks to @ThePlanplan for reporting this issue: https://github.com/MichaIng/DietPi/issues/6665
+
+As always, many smaller code performance and stability improvements, visual and spelling fixes have been done, too much to list all of them here. Check out all code changes of this release on GitHub: https://github.com/MichaIng/DietPi/pull/7142
+
+-----------------------------------------------------------------------------------------------------------
+
+v9.5
+(2024-06-09)
+
+New software:
+- Forgejo | This Gitea fork has been added to our software library. Read about the background of this fork here: https://forgejo.org/2022-12-15-hello-forgejo/. Many thanks to @Cs137 for requesting and @jcnils for implementing this software option: https://github.com/MichaIng/DietPi/discussions/6133, https://github.com/MichaIng/DietPi/pull/7071
+
+Enhancements:
+- Images | New DietPi images won't contain the "gnupg" package anymore, but "gpg" only, since other features of the suite are not required for our scripts anymore. E.g. "dirmngr" for interacting with keyservers, and "gpg-agent" for key passphrase inputs are hence missing. "gpg" however prints very clear error messages about what is missing. Let us know whether you find one of those GnuPG features too essential to not be pre-installed.
+- Radxa ZERO 3 | Onboard WiFi does now work OOTB on early ZERO 3W revisions with AP6212 WiFi chip.
+- Quartz64/Star64/VisionFive 2 | dm-crypt/LUCS support has been added to the kernel for those two SBCs. Many thanks to @gxsw for reporting this missing feature: https://github.com/MichaIng/DietPi/issues/7091
+- DietPi-Software | Jellyfin: Since a while FFmpeg 6 is available for Jellyfin, but on old installs with the old FFmpeg 5 package, it is not upgraded automatically by APT. This DietPi update applies the FFmpeg upgrade to all affected systems. Many thanks to @gioxx and @WolfganP for reporting this issue: https://github.com/MichaIng/DietPi/issues/7080
+- DietPi-Software | MediaWiki: Uploaded images are now preserved on reinstalls.
+
+Bug fixes:
+- Odroid C1/C2 | Resolved an issue on both SBCs where reboots could hang and a power cycle was required to get the device back up. Many thanks to @yandritos, @gociii and others for reporting this issue, and @gitmeister for providing the fix for Odroid C2: https://github.com/MichaIng/DietPi/issues/5414, https://github.com/MichaIng/DietPi/issues/6332
+- Orange Pi Zero 2W | Resolved an issue where the onboard Ethernet adapter did not work.
+- NanoPi NEO | Resolved an issue where LEDs of this SBC could not be configured, due to a conflicting kernel patch. Many thanks to @mhjessen for reporting this issue: https://github.com/MichaIng/DietPi/issues/5401
+- DietPi-Config | Resolved an issue where Advanced Options were not accessible on some SBCs. Many thanks to @thuehlinger for reporting this issue: https://github.com/MichaIng/DietPi/issues/6663#issuecomment-2108351878
+- DietPi-Software | Snapcast Server: Resolved on issue where on RISC-V systems, the web interface was not available, since it is not included in the "snapserver" package from Debian. Many thanks to @hllhll for reporting this issue: https://github.com/MichaIng/DietPi/issues/7073
+- DietPi-Software | Snapcast Server: Resolved an issue where on Bookworm systems, which installed the Snapcast Server before DietPi v9.4 and reinstalled it afterwards, the server failed to start due to a permissions issue, since the services of both packages use different users. Many thanks to @hllhll for reporting this issue: https://github.com/MichaIng/DietPi/issues/7073
+- DietPi-Software | Shairport Sync: Resolved a DietPi v9.4 regression, where the AirPlay 2 choice did not have an effect, but the AirPlay 1 package was always installed. Additionally, uninstalling Shairport Sync will now also purge the AirPlay 2 package. Many thanks to @pulpe for fixing this bug: https://github.com/MichaIng/DietPi/pull/7082
+- DietPi-Software | Box64: Resolved an issue where an invalid build target was used on Raspberry Pi 5 with 16k page size kernel. This target was removed with latest Box64, as page size handling is now done at runtime.
+- DietPi-Software | Jellyfin: Resolved an issue where the intended HTTP port change could not be applied, since the network config file is not created anymore at service start. We do now pre-create a minimal one, which is complemented with defaults automatically.
+- DietPi-Software | ADS-B Feeder: Resolved an issue where the service start could have failed because of a missing Python module. Many thanks to @moonraka for reporting the issue and @dirkhh sending a fix quickly: https://dietpi.com/forum/t/ads-b-feeder-not-working/20601
+
+As always, many smaller code performance and stability improvements, visual and spelling fixes have been done, too much to list all of them here. Check out all code changes of this release on GitHub: https://github.com/MichaIng/DietPi/pull/7098
+
+-----------------------------------------------------------------------------------------------------------
+
+v9.4
+(2024-05-12)
+
+New images:
+- ROCK 4C Plus | Since our Radxa ROCK 4 image has become incompatible with the ROCK 4C Plus, we provide a new image for this particular variant. Many thanks to @lfiorini and @arpegius5555 for reporting this issue: https://github.com/MichaIng/DietPi/issues/6593, https://github.com/MichaIng/DietPi/issues/6935
+- Orange Pi 3 LTS | Added support for this Allwinner H6 based SBC.
+- Radxa ZERO 3 | Added support for this Rockchip RK3566 based SBC, the 3E variant with Ethernet as well as the 3W variant with onboard WiFi.
+- Orange Pi Zero 2W | Support for this small form factor SBC with Allwinner H618 SoC was added.
+
+Enhancements:
+- General | Our scripts do now internally enforce the default umask 0022. Many config and install options rely on this, hence it can cause issues when e.g. 0027 (deny read access for "other" users) has been applied on the parent shell. This affects only the (sub)shell of our scripts, while the current and default umask of parent and of shells/consoles remains untouched.
+- NanoPi R5C | New images, or when flashing the new bootloader binary via dietpi-config > Advanced Options > Update MMC bootloader, support M.2 WiFi modules.
+- Orange Pi 3B | Added an option for updating the SPI bootloader via dietpi-config > Advanced Options > Update SPI bootloader.
+- Odroid XU4 | The kernel will be upgraded to Linux 6.6.
+- DietPi-CloudShell | On Odroid XU4, when using the CloudShell 2 LCD, during configured auto screen off times, the backlight power of the LCD will be disabled as well, to safe energy and avoid still visible black display content. Many thanks to @smac for suggesting this enhancement: https://dietpi.com/forum/t/15331/55
+- DietPi-Config | Added an option to the LCD display menu to toggle the Odroid XU4 CloudShell 2 LCD.
+- DietPi-Software | Snapcast: 64-bit ARM and Debian Bookworm + Trixie will have the now available packages from Snapcast installed, instead of those from the Debian repository.
+
+Bug fixes:
+- NanoPi NEO3 | Resolved an issue where the Ethernet adapter was not available after reboots. Many thanks to @murraythegoz for reporting this issue: https://github.com/MichaIng/DietPi/issues/6987
+- Orange Pi Zero 3 | Resolved an issue on the 1.5 GiB RAM variant, where the Ethernet adapter was not available anymore after soft/warm reboots.
+- Orange Pi 5 Plus | Resolved an issue where the Ethernet interface names eth0/eth1 could swap on (re)boot. We add a udev rule which assures they are named persistently based on the PCI bus identifier. In case you created own udev rules to mitigate the issue, please check whether they conflict and decide whether to use ours or your solution. The DietPi update will also inform you about this change with a prompt. Many thanks to @dirkhh and many others for reporting this issue: https://github.com/MichaIng/DietPi/issues/6592
+- DietPi-VPN | Resolved an issue where installing the IPVanish config failed, due to a changed URL, and startup failed on Bookworm systems since their configs contain a deprecated option. Many thanks to @DreamPhreak and @Michael-Robson for reporting this issue: https://github.com/MichaIng/DietPi/issues/7043
+- DietPi-Imager | Resolved an issue where the imager could have failed on GPT partitioned images, if either the source image size did not leave space for the GPT backup partition table, or the first usable LBA/sector was above 34. The GPT backup partition table is now created only at the end of the image generation, not anymore additionally at the start, and the required size it takes is correctly obtained. Many thanks to @SelfhostedPro and @disablewong for reporting this issue: https://github.com/MichaIng/DietPi/issues/7024, https://dietpi.com/forum/t/18035
+- DietPi-Config | Resolved a visual-only failure message on non-RPi systems, when enabling Bluetooth, and an actual failure doing so on Orange Pi Zero 3, Orange Pi 3B and Orange Pi Zero 2W, since the required kernel module "sprdbt_tty" was not loaded. Many thanks to @b9AcE for reporting this issue: https://dietpi.com/forum/t/19929/45
+- DietPi-Software | Snapcast: Resolved an issue where version 0.27.0 was installed, because since version 0.28.0, Snapcast is provided with client and server packages wrapped into one archive, instead having individual downloads for each package.
+- DietPi-Software | OctoPrint: Resolved an issue where the installation failed on RISC-V and ARMv6/7 Bullseye systems, due to changed dependencies.
+- DietPi-Software | X.Org X Server: Resolved an issue where an important config file might have been missing on RPi 5 and potentially Amlogic S905 SBCs, if the config directory /etc/X11/xorg.conf.d did not exist and was not created as part of the related APT packages. Many thanks to @rmscode for reporting this issue: https://dietpi.com/forum/t/19963
+
+As always, many smaller code performance and stability improvements, visual and spelling fixes have been done, too much to list all of them here. Check out all code changes of this release on GitHub: https://github.com/MichaIng/DietPi/pull/7063
+
+-----------------------------------------------------------------------------------------------------------
+
+v9.3
+(2024-04-14)
+
+Enhancements:
+- General | We added an own APT repository at https://dietpi.com/apt for own software and kernel/firmware builds. This simplifies updates for software packages like Squeezelite, vaultwarden and Amiberry, as well as allows us to provide own up-to-date kernel and bootloader packages, applied via regular "apt upgrade". A goal is also to become independent of some 3rd party repositories, which are regularly affected by network errors or provide package updates too infrequently.
+- DietPi-Config | Removed the 3.5mm audio option on Raspberry Pi 5, as it does not have a 3.5mm jack. Additionally, the KMS graphics driver is enabled OOTB when HDMI audio is selected, as the snd_bcm2835 driver does not work on Raspberry Pi 5. Many thanks to @denguido for making us aware of this: https://dietpi.com/forum/t/19760
 - DietPi-Software | Mosquitto: The official APT repository added support for 64-bit ARM on Bookworm, which is now used for our installation.
+- DietPi-Software | UnRAR: Debian added unrar packages for RISC-V, which are now used for our installation.
 
 Bug fixes:
 - Raspberry Pi 5 | Fixed X11/desktop startup if KMS is enabled. Many thanks to @denguido for reporting the issue and solution: https://dietpi.com/forum/t/19760
 - DietPi-Software | Logitech Media Server: Resolved an issue where the install failed due to a changed download URL. Many thanks to @JRK0469 for reporting this issue: https://github.com/MichaIng/DietPi/issues/6992
 
-As always, many smaller code performance and stability improvements, visual and spelling fixes have been done, too much to list all of them here. Check out all code changes of this release on GitHub: https://github.com/MichaIng/DietPi/pull/ADDME
+As always, many smaller code performance and stability improvements, visual and spelling fixes have been done, too much to list all of them here. Check out all code changes of this release on GitHub: https://github.com/MichaIng/DietPi/pull/7016
 
 -----------------------------------------------------------------------------------------------------------
 

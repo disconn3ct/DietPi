@@ -207,6 +207,7 @@ _EOF_
 			'urbackupsrv'
 			'gogs'
 			'gitea'
+			'forgejo'
 			'vaultwarden'
 			'filebrowser'
 
@@ -229,6 +230,7 @@ _EOF_
 			'openbazaar'
 			'synapse'
 			'microblog-pub'
+			'soju'
 
 			# - Hardware Projects
 			'pi-spc'

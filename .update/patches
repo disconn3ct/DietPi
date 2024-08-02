@@ -38,6 +38,7 @@ export G_SERVICE_CONTROL=0
 
 # ToDo: On RPi 4, the 64-bit kernel is now used by default, without "arm_64bit=1" set: https://forums.raspberrypi.com/viewtopic.php?p=2088935#p2088935
 # - We could set "arm_64bit=0", but for now lets assure that 32-bit software is installed and see how it goes. This enables general support for RPi with 64-bit kernel running 32-bit userland.
+# shellcheck disable=SC2034
 [[ $G_HW_MODEL == [2-9] && $G_HW_ARCH == 3 && $(dpkg --print-architecture) == 'armhf' ]] && G_HW_ARCH=2 G_HW_ARCH_NAME='armv7l'
 
 # Version-based incremental patches
@@ -712,6 +713,18 @@ Patch_8_7()
 		G_DIETPI-NOTIFY 2 'Removing duplicate "cgroup_enable=memory" kernel command-line argument...'
 		G_EXEC sed --follow-symlinks -i 's/ cgroup_enable=memory//' /boot/cmdline.txt
 	done
+
+	# vaultwarden
+	if [[ -f '/boot/dietpi/.installed' ]] && grep -q '^[[:blank:]]*aSOFTWARE_INSTALL_STATE\[183\]=2' /boot/dietpi/.installed && dpkg --compare-versions "$(dpkg-query -Wf '${Version}' vaultwarden 2> /dev/null)" lt 1.30.5-dietpi1
+	then
+		# Pre-v8.7 cleanup
+		[[ -f '/opt/vaultwarden/target/release/vaultwarden' ]] && G_EXEC rm -R /opt/vaultwarden
+		[[ -f '/etc/systemd/system/vaultwarden.service' ]] && G_EXEC rm /etc/systemd/system/vaultwarden.service
+		G_DIETPI-NOTIFY 2 'Updating vaultwarden package ...'
+		G_EXEC_OUTPUT=1 G_EXEC curl -fo package.deb "https://dietpi.com/downloads/binaries/$G_DISTRO_NAME/vaultwarden_$G_HW_ARCH_NAME.deb"
+		G_AGI ./package.deb
+		G_EXEC rm package.deb
+	fi
 }
 
 Patch_8_8(){ :; }
@@ -1218,14 +1231,6 @@ Patch_8_19()
 		# Mopidy: Bullseye suite now available in official APT repo
 		[[ -f '/etc/apt/sources.list.d/mopidy.list' ]] && grep -q buster /etc/apt/sources.list.d/mopidy.list && G_EXEC sed --follow-symlinks -i 's/buster/bullseye/' /etc/apt/sources.list.d/mopidy.list
 
-		# GMediaRender
-		grep -q '^[[:blank:]]*aSOFTWARE_INSTALL_STATE\[163\]=2' /boot/dietpi/.installed && dpkg --compare-versions "$(dpkg-query -Wf '${Version}' gmediarender 2> /dev/null)" lt 0.1-dietpi1 && G_WHIP_MSG '[ INFO ] GMediaRender update available
-\nAn update to GMediaRender 0.1 is available.
-Release notes: https://github.com/hzeller/gmrender-resurrect/releases
-\nDo you want to apply the update now?
-\nYou can manually apply it any time via:
-# dietpi-software reinstall 163' && echo 163 >> /var/tmp/dietpi/dietpi-update_reinstalls
-
 		# ympd
 		if grep -q '^[[:blank:]]*aSOFTWARE_INSTALL_STATE\[32\]=2' /boot/dietpi/.installed
 		then
@@ -1286,16 +1291,8 @@ Patch_8_22()
 	[[ -f '/etc/apt/preferences.d/dietpi-armbian-tmp' ]] && G_EXEC rm /etc/apt/preferences.d/dietpi-armbian-tmp
 	[[ -f '/etc/apt/apt.conf.d/dietpi-armbian' ]] && G_EXEC rm /etc/apt/apt.conf.d/dietpi-armbian
 
-	# Odroid C1: Set kernel packages on hold. We pin them in pre-patches and enforce an automated downgrade, in case, but since v23.02.2 might not be available forever, we should also set them on hold, until we know there is a compatble newer version available:
-	# - https://dietpi.com/forum/t/odroid-c1-not-booting-after-kernel-upgrade/17818
-	# - https://github.com/MichaIng/DietPi/issues/6616#issuecomment-1730900296
-	if (( $G_HW_MODEL == 10 ))
-	then
-		G_DIETPI-NOTIFY 2 'Setting Odroid C1 "current" and "edge" kernel packages on hold'
-		G_EXEC apt-mark hold linux-image-current-meson linux-dtb-current-meson linux-headers-current-meson linux-image-edge-meson linux-dtb-edge-meson linux-headers-edge-meson
-
 	# NanoPi R4S: Fix Ethernet LEDs: https://github.com/MichaIng/DietPi/issues/6342#issuecomment-1697669420
-	elif (( $G_HW_MODEL == 47 ))
+	if (( $G_HW_MODEL == 47 ))
 	then
 		G_DIETPI-NOTIFY 2 'Updating udev rule for NanoPi R4S Ethernet LEDs'
 		G_EXEC eval 'echo '\''ledtrig-netdev'\'' > /etc/modules-load.d/dietpi-eth-leds.conf'
@@ -1314,16 +1311,8 @@ _EOF_
 
 Patch_8_23()
 {
-	# RPi: Update raspberrypi-sys-mods: https://github.com/MichaIng/DietPi/issues/6666
-	if (( $G_HW_MODEL < 10 )) && dpkg --compare-versions "$(dpkg-query -Wf '${Version}' raspberrypi-sys-mods 2> /dev/null)" lt-nl 2:20230510-dietpi2
-	then
-		G_DIETPI-NOTIFY 2 'Updating raspberrypi-sys-mods package ...'
-		G_EXEC_OUTPUT=1 G_EXEC curl -fo package.deb 'https://dietpi.com/downloads/binaries/raspberrypi-sys-mods.deb'
-		G_EXEC_OUTPUT=1 G_EXEC dpkg -i --force-confdef,confold package.deb
-		G_EXEC rm package.deb
-
 	# VisionFive 2
-	elif (( $G_HW_MODEL == 81 )) && dpkg --compare-versions "$(dpkg-query -Wf '${Version}' linux-image-visionfive2 2> /dev/null)" lt-nl 6.1.59-dietpi1
+	if (( $G_HW_MODEL == 81 )) && dpkg --compare-versions "$(dpkg-query -Wf '${Version}' linux-image-visionfive2 2> /dev/null)" lt-nl 6.1.59-dietpi1
 	then
 		G_DIETPI-NOTIFY 2 'Updating RISC-V StarFive VisionFive 2 kernel ...'
 		G_EXEC_OUTPUT=1 G_EXEC curl -fo package.deb 'https://dietpi.com/downloads/binaries/linux-image-visionfive2.deb'
@@ -1405,17 +1394,13 @@ Patch_8_24()
 		[[ -f '/etc/modprobe.d/dietpi-disable_bluetooth.conf' ]] || G_EXEC eval 'echo '\''sprdbt_tty'\'' > /etc/modules-load.d/dietpi-enable_bluetooth.conf'
 	fi
 
-	# Software updates and migrations
-	if [[ -f '/boot/dietpi/.installed' ]]
+	# Shairport Sync
+	if [[ -f '/boot/dietpi/.installed' ]] && grep -q '^[[:blank:]]*aSOFTWARE_INSTALL_STATE\[37\]=2' /boot/dietpi/.installed && dpkg --compare-versions "$(dpkg-query -Wf '${Version}' shairport-sync 2> /dev/null)" lt 4.3.2-dietpi2
 	then
-		# Shairport Sync
-		if grep -q '^[[:blank:]]*aSOFTWARE_INSTALL_STATE\[37\]=2' /boot/dietpi/.installed && dpkg --compare-versions "$(dpkg-query -Wf '${Version}' shairport-sync 2> /dev/null)" lt 4.3.2-dietpi2
-		then
-			G_DIETPI-NOTIFY 2 'Updating Shairport Sync package ...'
-			G_EXEC_OUTPUT=1 G_EXEC curl -fo package.deb "https://dietpi.com/downloads/binaries/$G_DISTRO_NAME/shairport-sync_$G_HW_ARCH_NAME.deb"
-			G_AGI ./package.deb
-			G_EXEC rm package.deb
-		fi
+		G_DIETPI-NOTIFY 2 'Updating Shairport Sync package ...'
+		G_EXEC_OUTPUT=1 G_EXEC curl -fo package.deb "https://dietpi.com/downloads/binaries/$G_DISTRO_NAME/shairport-sync_$G_HW_ARCH_NAME.deb"
+		G_AGI ./package.deb
+		G_EXEC rm package.deb
 	fi
 }
 
@@ -1509,48 +1494,6 @@ map $arg_v $asset_immutable {
 
 Patch_9_2()
 {
-	# NanoPi R4S: Solve Ethernet adapter disappearing on soft reboot: https://github.com/MichaIng/DietPi/issues/6342
-	if (( $G_HW_MODEL == 47 )) && dpkg --compare-versions "$(dpkg-query -Wf '${Version}' linux-image-current-rockchip64 2> /dev/null)" lt-nl 24.2.0
-	then
-		G_DIETPI-NOTIFY 2 'Updating NanoPi R4S kernel ...'
-		G_EXEC_OUTPUT=1 G_EXEC curl -fo package1.deb 'https://dietpi.com/downloads/binaries/linux-image-current-rockchip64.deb'
-		G_EXEC_OUTPUT=1 G_EXEC curl -fo package2.deb 'https://dietpi.com/downloads/binaries/linux-dtb-current-rockchip64.deb'
-		G_EXEC_OUTPUT=1 G_EXEC curl -fo package3.deb 'https://dietpi.com/downloads/binaries/armbian-firmware.deb'
-		local headers=()
-		dpkg-query -s 'linux-headers-current-rockchip64' &> /dev/null && { G_EXEC_OUTPUT=1 G_EXEC curl -fo package4.deb 'https://dietpi.com/downloads/binaries/linux-headers-current-rockchip64.deb'; headers=('package4.deb'); }
-		G_EXEC_OUTPUT=1 G_EXEC dpkg -i --force-confdef,confold package1.deb package2.deb package3.deb "${headers[@]}"
-		G_EXEC rm package1.deb package2.deb package3.deb "${headers[@]}"
-
-	# Quartz64
-	elif (( $G_HW_MODEL == 49 ))
-	then
-		for i in quartz64{a,b} soquartz
-		do
-			dpkg --compare-versions "$(dpkg-query -Wf '${Version}' "firmware-$i" 2> /dev/null)" lt-nl 6.7.4-dietpi1 || continue
-			G_DIETPI-NOTIFY 2 "Updating $i kernel and bootloader ..."
-			G_EXEC_OUTPUT=1 G_EXEC curl -fo package.deb "https://dietpi.com/downloads/binaries/firmware-$i.deb"
-			G_EXEC_OUTPUT=1 G_EXEC dpkg -i --force-confdef,confold package.deb
-			G_EXEC rm package.deb
-			break
-		done
-
-	# VisionFive 2
-	elif (( $G_HW_MODEL == 81 )) && dpkg --compare-versions "$(dpkg-query -Wf '${Version}' linux-image-visionfive2 2> /dev/null)" lt-nl 6.1.81-dietpi1
-	then
-		G_DIETPI-NOTIFY 2 'Updating RISC-V StarFive VisionFive 2 kernel ...'
-		G_EXEC_OUTPUT=1 G_EXEC curl -fo package.deb 'https://dietpi.com/downloads/binaries/linux-image-visionfive2.deb'
-		G_EXEC_OUTPUT=1 G_EXEC dpkg -i --force-confdef,confold package.deb
-		G_EXEC rm package.deb
-
-	# Star64
-	elif (( $G_HW_MODEL == 84 )) && dpkg --compare-versions "$(dpkg-query -Wf '${Version}' linux-image-star64 2> /dev/null)" lt-nl 6.1.81-dietpi1
-	then
-		G_DIETPI-NOTIFY 2 'Updating RISC-V PINE64 Star64 kernel ...'
-		G_EXEC_OUTPUT=1 G_EXEC curl -fo package.deb 'https://dietpi.com/downloads/binaries/linux-image-star64.deb'
-		G_EXEC_OUTPUT=1 G_EXEC dpkg -i --force-confdef,confold package.deb
-		G_EXEC rm package.deb
-	fi
-
 	# Software updates and migrations
 	if [[ -f '/boot/dietpi/.installed' ]]
 	then
@@ -1586,21 +1529,6 @@ Patch_9_2()
 			G_EXEC rm package.deb
 		fi
 
-		# vaultwarden
-		if grep -q '^[[:blank:]]*aSOFTWARE_INSTALL_STATE\[183\]=2' /boot/dietpi/.installed && dpkg --compare-versions "$(dpkg-query -Wf '${Version}' vaultwarden 2> /dev/null)" lt 1.30.5-dietpi1
-		then
-			# Pre-v8.7 cleanup
-			if [[ -f '/opt/vaultwarden/target/release/vaultwarden' ]]
-			then
-				G_EXEC rm -R /opt/vaultwarden
-				[[ -f '/etc/systemd/system/vaultwarden.service' ]] && G_EXEC rm /etc/systemd/system/vaultwarden.service
-			fi
-			G_DIETPI-NOTIFY 2 'Updating vaultwarden package ...'
-			G_EXEC_OUTPUT=1 G_EXEC curl -fo package.deb "https://dietpi.com/downloads/binaries/$G_DISTRO_NAME/vaultwarden_$G_HW_ARCH_NAME.deb"
-			G_AGI ./package.deb
-			G_EXEC rm package.deb
-		fi
-
 		# Amiberry
 		if grep -q '^[[:blank:]]*aSOFTWARE_INSTALL_STATE\[108\]=2' /boot/dietpi/.installed && dpkg --compare-versions "$(dpkg-query -Wf '${Version}' amiberry 2> /dev/null)" lt 5.6.8-dietpi1
 		then
@@ -1610,10 +1538,218 @@ Patch_9_2()
 	fi
 }
 
+PATCH_9_3_RAN=0
 Patch_9_3()
 {
 	# Purge ancient vmtouch which prevents /boot from being unmounted e.g. for RPi firmware migration: https://github.com/MichaIng/DietPi/issues/6819, https://github.com/MichaIng/DietPi/issues/6976
 	[[ -f '/etc/default/vmtouch' ]] && grep -q '/boot/dietpi' /etc/default/vmtouch && G_AGP vmtouch
+
+	# Add DietPi APT repo
+	/boot/dietpi/func/dietpi-set_software apt-mirror dietpi
+	G_AGUP
+	G_AGUG
+	PATCH_9_3_RAN=1
+}
+
+Patch_9_4()
+{
+	# Update DietPi APT list for several SBCs we added components to our repo for
+	if [[ $PATCH_9_3_RAN == 0 && $G_HW_MODEL =~ ^(11|40|44|45|48|56|57|59|60|64|65|67|76|78|79|80|82|83|85|88|89|90)$ ]]
+	then
+		/boot/dietpi/func/dietpi-set_software apt-mirror dietpi
+		G_AGUP
+		G_AGUG
+	fi
+
+	# Odroid XU4
+	if (( $G_HW_MODEL == 11 ))
+	then
+		G_DIETPI-NOTIFY 2 'Migrating boot.ini to support new Linux 6.6 device tree overlay locations'
+		/boot/dietpi/func/dietpi-set_hardware flash-u-boot-mmc
+		# shellcheck disable=SC2016
+		G_EXEC sed --follow-symlinks -i '\|/boot/dtb/overlays/${overlay}.dtbo|c\        load mmc 0:1 0x60000000 /boot/dtb/${overlay}.dtbo || load mmc 0:1 0x60000000 /boot/dtb/overlays/${overlay}.dtbo || load mmc 0:1 0x60000000 dtb/${overlay}.dtbo || load mmc 0:1 0x60000000 dtb/overlays/${overlay}.dtbo' /boot/boot.ini
+		G_DIETPI-NOTIFY 2 'Fixing CEC toggle in boot.ini'
+		G_EXEC sed --follow-symlinks -i 's|rm /cec@101B0000;|rm /soc/cec@101b0000;|' /boot/boot.ini
+		G_DIETPI-NOTIFY 2 'Cleaning up obsolete configs'
+		[[ -f '/etc/modprobe.d/odroid-cloudshell.conf' ]] && G_EXEC rm /etc/modprobe.d/odroid-cloudshell.conf
+		G_EXEC sed --follow-symlinks -Ei '/^[[:blank:]]*(gpioplug-ir-recv|fbtft_device)[[:blank:]]*$/d' /etc/modules
+
+	# Orange Pi 5 Plus
+	elif (( $G_HW_MODEL == 82 ))
+	then
+		G_DIETPI-NOTIFY 2 'Assuring persistent classic Ethernet interface names: /etc/udev/rules.d/99-dietpi-orangepi5plus.rules'
+		G_WHIP_MSG '[ WARN ] Persistent eth0/eth1 interface names will be applied
+\nSince classic interface names are randomly applied among the two onboard Ethernet adapters, we install a udev rule, which assures they remain the same on each (re)boot:
+- /etc/udev/rules.d/99-dietpi-orangepi5plus.rules
+\nIf you applied an own workaround via /etc/network/interfaces or similar, this will not be affected. But if you created own udev rules to mitigate the issue, please check whether those conflict with ours. Of course you can remove or rename above file to maintain status quo.'
+		cat << '_EOF_' > /etc/udev/rules.d/99-dietpi-orangepi5plus.rules
+SUBSYSTEM=="net", KERNEL=="eth0", KERNELS=="0004:41:00.0", RUN:="/bin/true"
+SUBSYSTEM=="net", KERNEL=="eth1", KERNELS=="0003:31:00.0", NAME="to_eth0", RUN:="/bin/true"
+SUBSYSTEM=="net", KERNEL=="to_eth0", RUN="/bin/ip l s dev eth0 name eth1", RUN+="/bin/ip l s dev to_eth0 name eth0", RUN+="/bin/udevadm trigger -c add /sys/class/net/eth0 /sys/class/net/eth1"
+_EOF_
+	# Orange Pi Zero 3 1.5 GiB RAM: Fix lost Ethernet adapter on reboot: https://github.com/MichaIng/DietPi/issues/6938
+	elif (( $G_HW_MODEL == 83 )) && dpkg-query -s 'linux-u-boot-orangepizero3-next' &> /dev/null
+	then
+		G_DIETPI-NOTIFY 2 'Switching to new U-Boot build which fixes lost Ethernet adapter on reboot ...'
+		G_AGP linux-u-boot-orangepizero3-next
+		G_AGI linux-u-boot-orangepizero3-current
+		/boot/dietpi/func/dietpi-set_hardware flash-u-boot-mmc
+	fi
+
+	if [[ -f '/boot/dietpi/.installed' ]]
+	then
+		# GMediaRender
+		if grep -q '^[[:blank:]]*aSOFTWARE_INSTALL_STATE\[163\]=2' /boot/dietpi/.installed && ! dpkg-query -s 'gmediarender' &> /dev/null
+		then
+			# Pre-v8.10
+			G_DIETPI-NOTIFY 2 'Updateing GMediaRender ...'
+			[[ -f '/etc/systemd/system/gmediarender.service' ]] && G_EXEC rm /etc/systemd/system/gmediarender.service
+			[[ -d '/etc/systemd/system/gmediarender.service.d' ]] && grep -Rq '/usr/local/bin/gmediarender' /etc/systemd/system/gmediarender.service.d && G_EXEC rm -R /etc/systemd/system/gmediarender.service.d
+			getent passwd gmrender > /dev/null && G_EXEC userdel gmrender
+			getent group gmrender > /dev/null && G_EXEC groupdel gmrender
+			[[ -f '/usr/local/bin/gmediarender' ]] && G_EXEC rm /usr/local/bin/gmediarender
+			[[ -d '/usr/local/share/gmediarender' ]] && G_EXEC rm -R /usr/local/share/gmediarender
+			G_AGI gmediarender
+		fi
+
+		# Shairport Sync
+		if grep -q '^[[:blank:]]*aSOFTWARE_INSTALL_STATE\[37\]=2' /boot/dietpi/.installed
+		then
+			[[ -f '/usr/local/share/man/man7/shairport-sync.7.gz' ]] && G_EXEC rm /usr/local/share/man/man7/shairport-sync.7.gz
+			[[ -d '/usr/local/share/man/man7' ]] && G_EXEC rmdir -p --ignore-fail-on-non-empty /usr/local/share/man/man7
+		fi
+	fi
+}
+
+Patch_9_5()
+{
+	# Update DietPi APT list for several SBCs we added components to our repo for
+	if [[ $PATCH_9_3_RAN == 0 && $G_HW_MODEL =~ ^(12|15|16|54|74)$ ]]
+	then
+		/boot/dietpi/func/dietpi-set_software apt-mirror dietpi
+		G_AGUP
+		G_AGUG
+	fi
+
+	# Flash new U-Boot on Odroid C1 and Radxa ZERO 3
+	(( $G_HW_MODEL == 10 || $G_HW_MODEL == 90 )) && /boot/dietpi/func/dietpi-set_hardware flash-u-boot-mmc
+
+	# Do not hardcode device tree on Radxa ZERO 3, after flashing our new U-Boot, since it does now select the correct device tree with onboard WiFi support, based on hardware details.
+	(( $G_HW_MODEL == 90 )) && sed -i '/^fdtfile=rockchip/rk3566-radxa-zero3.dtb$/d' /boot/dietpiEnv.txt
+
+	# Update MPD flag on Bookworm and above: https://github.com/MusicPlayerDaemon/MPD/commit/ce77b14
+	(( $G_DISTRO > 6 )) && [[ -f '/etc/systemd/system/mpd.service.d/dietpi.conf' ]] && G_EXEC sed -i 's/no-daemon/systemd/' /etc/systemd/system/mpd.service.d/dietpi.conf
+
+	# Migrate jellyfin-ffmpeg5 => jellyfin-ffmpeg6
+	if dpkg-query -s jellyfin &> /dev/null && dpkg-query -s jellyfin-ffmpeg5 &> /dev/null
+	then
+		G_DIETPI-NOTIFY 2 'Migrating to Jellyfin FFmpeg 6'
+		G_AGI jellyfin
+		G_AGP jellyfin-ffmpeg5 # conffiles
+	fi
+}
+
+Patch_9_6()
+{
+	# Update DietPi APT list for several SBCs we added components to our repo for
+	if [[ $PATCH_9_3_RAN == 0 && $G_HW_MODEL =~ ^(42|43|46|47|52|55|58|68|72|73|76|77|86|87)$ ]]
+	then
+		/boot/dietpi/func/dietpi-set_software apt-mirror dietpi
+		G_AGUP
+		G_AGUG
+
+	# Orange Pi 5: Offer to flash new U-Boot image to solve random Ethernet MAC address: https://github.com/MichaIng/DietPi/issues/6663
+	elif (( $G_HW_MODEL == 80 ))
+	then
+		if G_WHIP_YESNO '[ INFO ] U-Boot update available to solve random Ethernet MAC address
+\nIn case you are affected by a random Ethernet MAC address, which changes every boot, flashing the latest U-Boot image has shown to solve it: https://github.com/MichaIng/DietPi/issues/6663
+\nDo you want to flash the latest U-Boot image now?
+\nNB: This can be done any time later via dietpi-config > Advanced Options.'
+		then
+			if [[ $G_ROOTFS_DEV == '/dev/mmcblk'* || $G_ROOTFS_DEV == '/dev/loop'* ]]
+			then
+				/boot/dietpi/func/dietpi-set_hardware flash-u-boot-mmc
+
+			elif [[ -b '/dev/mtdblock0' ]]
+			then
+				# shellcheck disable=SC1091
+				. /usr/lib/u-boot/platform_install.sh
+				# shellcheck disable=SC2154
+				G_EXEC_OUTPUT=1 G_EXEC dd if="$DIR/rkspi_loader.img" of=/dev/mtdblock0 oflag=direct conv=notrunc status=progress
+			else
+				G_WHIP_MSG '[FAILED] SPI block device /dev/mtdblock0 not found
+\nWe expect the SPI block device /dev/mtdblock0 to be the target for the U-Boot image. It however does not exist.
+\nPlease report this to our forum or GitHub site, so we can check back:
+- https://dietpi.com/forum/c/troubleshooting/10
+- https://github.com/MichaIng/DietPi/issues'
+			fi
+		fi
+
+	# NanoPi R6C: Migrate to dedicated APT component and U-Boot package: https://github.com/MichaIng/DietPi/issues/7109
+	elif (( $G_HW_MODEL == 79 )) && grep -q '^[[:blank:]]*fdtfile=rockchip/rk3588s-nanopi-r6c.dtb$' /boot/dietpiEnv.txt
+	then
+		HW_VARIANT=2 /boot/dietpi/func/dietpi-set_software apt-mirror dietpi
+		G_AGUP
+		G_AGI linux-u-boot-nanopi-r6c-legacy
+
+	# Odroid XU4/Meson: Install zstd for better compressed initramfs images
+	elif dpkg-query -s 'linux-image-current-odroidxu4' &> /dev/null || dpkg-query -s 'linux-image-edge-odroidxu4' &> /dev/null ||  dpkg-query -s 'linux-image-current-meson' &> /dev/null || dpkg-query -s 'linux-image-edge-meson' &> /dev/null
+	then
+		G_AGI zstd
+	fi
+
+	# Remove Armbian APT repository from all systems which have an "all" component for kernel/bootloader/firmware packages form our APT repository
+	if [[ -f '/etc/apt/sources.list.d/dietpi-armbian.list' && -f '/etc/apt/sources.list.d/dietpi.list' ]] && grep -q 'dietpi.com/apt all' /etc/apt/sources.list.d/dietpi.list
+	then
+		G_DIETPI-NOTIFY 2 'Removing obsolete Armbian APT repository'
+		G_EXEC rm /etc/apt/sources.list.d/dietpi-armbian.list
+		[[ -f '/etc/apt/preferences.d/dietpi-armbian' ]] && G_EXEC rm /etc/apt/preferences.d/dietpi-armbian
+		[[ -f '/etc/apt/trusted.gpg.d/dietpi-armbian.gpg' ]] && G_EXEC rm /etc/apt/trusted.gpg.d/dietpi-armbian.gpg
+	fi
+
+	# Remove obsolete drop-in config: https://github.com/MichaIng/DietPi/issues/7104
+	[[ -f '/etc/systemd/system/ifup@.service.d/dietpi.conf' ]] && G_EXEC rm -R /etc/systemd/system/ifup@.service.d/dietpi.conf
+	[[ -d '/etc/systemd/system/ifup@.service.d' ]] && G_EXEC rmdir --ignore-fail-on-non-empty /etc/systemd/system/ifup@.service.d
+
+	# Fix filter for STDOUT logging since Bookworm: https://github.com/fail2ban/fail2ban/pull/3597
+	if [[ -f '/etc/fail2ban/filter.d/dropbear.conf' && ! -f '/etc/fail2ban/filter.d/dropbear.local' ]]
+	then
+		G_DIETPI-NOTIFY 2 'Fixing Dropbear Fail2Ban filter for STDOUT logging since Bookworm: https://github.com/fail2ban/fail2ban/pull/3597'
+		cat << '_EOF_' > /etc/fail2ban/filter.d/dropbear.local
+[INCLUDES]
+before = common.conf
+
+[Definition]
+
+_daemon = dropbear
+
+# Fix filter for STDOUT logging since Bookworm: https://github.com/fail2ban/fail2ban/pull/3597
+prefregex = ^%(__prefix_line)s(\[\d+\] [A-Z][a-z]+ \d\d \d\d:\d\d:\d\d )?<F-CONTENT>(?:[Ll]ogin|[Bb]ad|[Ee]xit).+</F-CONTENT>$
+
+failregex = ^[Ll]ogin attempt for nonexistent user ('.*' )?from <HOST>:\d+$
+            ^[Bb]ad (PAM )?password attempt for .+ from <HOST>(:\d+)?$
+            ^[Ee]xit before auth \(user '.+', \d+ fails\): Max auth tries reached - user '.+' from <HOST>:\d+\s*$
+
+ignoreregex =
+
+# Add journalmatch to enhance performance since Bookworm
+journalmatch = _SYSTEMD_UNIT=dropbear.service + _COMM=dropbear
+_EOF_
+		G_EXEC systemctl restart fail2ban
+	fi
+}
+
+Patch_9_7()
+{
+	# Software updates, migrations and patches
+	if [[ -f '/boot/dietpi/.installed' ]]
+	then
+		# Bazarr
+		if grep -q '^[[:blank:]]*aSOFTWARE_INSTALL_STATE\[180\]=2' /boot/dietpi/.installed && [[ -f '/etc/systemd/system/bazarr.service' ]]
+		then
+			G_CONFIG_INJECT 'KillSignal=' 'KillSignal=SIGINT' /etc/systemd/system/bazarr.service '\[Service\]'
+		fi
+	fi
 }
 
 # v6.35 => v7 migration

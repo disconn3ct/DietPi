@@ -13,6 +13,16 @@ else
 	. /tmp/dietpi-globals
 	G_EXEC rm /tmp/dietpi-globals
 	export G_GITOWNER G_GITBRANCH G_HW_ARCH_NAME=$(uname -m)
+	read -r debian_version < /etc/debian_version
+	case $debian_version in
+		'11.'*|'bullseye/sid') G_DISTRO=6;;
+		'12.'*|'bookworm/sid') G_DISTRO=7;;
+		'13.'*|'trixie/sid') G_DISTRO=8;;
+		*) G_DIETPI-NOTIFY 1 "Unsupported distro version \"$debian_version\". Aborting ..."; exit 1;;
+	esac
+	# Ubuntu ships with /etc/debian_version from Debian testing, hence we assume one version lower.
+	grep -q '^ID=ubuntu' /etc/os-release && ((G_DISTRO--))
+	(( $G_DISTRO < 6 )) && { G_DIETPI-NOTIFY 1 'Unsupported Ubuntu version. Aborting ...'; exit 1; }
 fi
 case $G_HW_ARCH_NAME in
 	'armv6l') export G_HW_ARCH=1;;
@@ -88,7 +98,7 @@ Process_Software()
 			7) aCOMMANDS[i]='ffmpeg -version';;
 			9) aCOMMANDS[i]='node -v';;
 			#16) aSERVICES[i]='microblog-pub' aTCP[i]='8007';; Service enters a CPU-intense internal error loop until it has been configured interactively via "microblog-pub configure", hence it is not enabled and started anymore after install but instead as part of "microblog-pub configure"
-			17) aCOMMANDS[i]='git -v';;
+			17) aCOMMANDS[i]='git --version';; # from Bookworm on, the shorthand "-v" is supported
 			28) aSERVICES[i]='vncserver' aTCP[i]='5901';;
 			29) aSERVICES[i]='xrdp' aTCP[i]='3389';;
 			30) aSERVICES[i]='nxserver' aTCP[i]='4000';;
@@ -169,7 +179,7 @@ Process_Software()
 			139) aSERVICES[i]='sabnzbd' aTCP[i]='8080'; (( $arch == 10 )) || aDELAY[i]=30;; # ToDo: Solve conflict with Airsonic
 			140) aSERVICES[i]='domoticz' aTCP[i]='8124 8424';;
 			#142) aSERVICES[i]='snapd';; "system does not fully support snapd: cannot mount squashfs image using "squashfs": mount: /tmp/syscheck-mountpoint-2075108377: mount failed: Operation not permitted."
-			143) aSERVICES[i]='koel' aTCP[i]='8003';;
+			143) aSERVICES[i]='koel' aTCP[i]='8003'; (( $arch == 10 )) || aDELAY[i]=30;;
 			144) aSERVICES[i]='sonarr' aTCP[i]='8989'; (( $arch < 10 )) && aDELAY[i]=90;;
 			145) aSERVICES[i]='radarr' aTCP[i]='7878'; (( $arch < 10 )) && aDELAY[i]=90;;
 			146) aSERVICES[i]='tautulli' aTCP[i]='8181'; (( $arch == 10 )) || aDELAY[i]=60;;
@@ -181,7 +191,7 @@ Process_Software()
 			152) aSERVICES[i]='avahi-daemon' aUDP[i]='5353';;
 			153) aSERVICES[i]='octoprint' aTCP[i]='5001'; (( $arch == 10 )) || aDELAY[i]=60;;
 			154) aSERVICES[i]='roonserver';; # Listens on a variety of different port ranges
-			155) aSERVICES[i]='htpc-manager' aTCP[i]='8085';;
+			155) aSERVICES[i]='htpc-manager' aTCP[i]='8085'; (( $arch == 10 )) || aDELAY[i]=30; [[ $arch == 3 && $DISTRO == 'trixie' ]] && aDELAY[i]=60;;
 			157) aSERVICES[i]='home-assistant' aTCP[i]='8123'; (( $arch == 10 )) && aDELAY[i]=60 || aDELAY[i]=900;;
 			158) aSERVICES[i]='minio' aTCP[i]='9001 9004';;
 			161) aSERVICES[i]='bdd' aTCP[i]='80 443';;
@@ -197,6 +207,7 @@ Process_Software()
 			172) aSERVICES[i]='wg-quick@wg0' aUDP[i]='51820';;
 			174) aCOMMANDS[i]='gimp -v';;
 			176) aSERVICES[i]='mycroft';;
+			177) aSERVICES[i]='forgejo' aTCP[i]='3000'; (( $arch < 10 )) && aDELAY[i]=30;;
 			178) aSERVICES[i]='jellyfin' aTCP[i]='8097'; [[ $arch == [23] ]] && aDELAY[i]=300;; # jellyfin[9983]: arm-binfmt-P: ../../target/arm/translate.c:9659: thumb_tr_translate_insn: Assertion `(dc->base.pc_next & 1) == 0' failed.   ###   jellyfin[9983]: qemu: uncaught target signal 6 (Aborted) - core dumped   ###   about 5 times
 			179) aSERVICES[i]='komga' aTCP[i]='2037'; (( $arch == 10 )) && aDELAY[i]=30; (( $arch < 10 )) && aDELAY[i]=300;;
 			180) aSERVICES[i]='bazarr' aTCP[i]='6767'; (( $arch == 10 )) && aDELAY[i]=30; (( $arch < 10 )) && aDELAY[i]=90;;
@@ -229,6 +240,7 @@ Process_Software()
 			209) aCOMMANDS[i]='restic version';;
 			211) aCOMMANDS[i]='hb-service status' aSERVICES[i]='homebridge' aTCP[i]='8581'; (( $arch < 10 )) && aDELAY[i]=30; (( $arch == 3 )) && aDELAY[i]=120;;
 			212) aSERVICES[i]='kavita' aTCP[i]='2036'; (( $arch < 10 )) && aDELAY[i]=180; (( $arch == 10 )) && aDELAY[i]=30;;
+			213) aSERVICES[i]='soju' aTCP[i]='6667';;
 			*) :;;
 		esac
 	done
@@ -244,12 +256,14 @@ do
 		8|33|131|179|206) Process_Software 196;;
 		32|148|119) Process_Software 128;;
 		129) Process_Software 88 89 128 webserver;;
-		49|165) Process_Software 88;;
+		49|165|177) Process_Software 0 17 88;;
 		#61) Process_Software 60;; # Cannot be installed in CI
 		125) Process_Software 194;;
 		#86|134|185) Process_Software 162;; # Docker does not start in systemd containers (without dedicated network)
 		166) Process_Software 70;;
 		180) (( $arch == 10 || $arch == 3 )) || Process_Software 170;;
+		188) Process_Software 17;;
+		213) Process_Software 17 188;;
 		*) :;;
 	esac
 	Process_Software "$i"
@@ -259,8 +273,27 @@ done
 # Dependencies
 ##########################################
 apackages=('xz-utils' 'parted' 'fdisk' 'systemd-container')
-(( $G_HW_ARCH == $arch || ( $G_HW_ARCH < 10 && $G_HW_ARCH > $arch ) )) || apackages+=('qemu-user-static' 'binfmt-support')
+
+# Emulation support in case of incompatible architecture
+emulation=0
+(( $G_HW_ARCH == $arch || ( $G_HW_ARCH < 10 && $G_HW_ARCH > $arch ) )) || emulation=1
+
+# Bullseye/Jammy: binfmt-support still required for emulation. With systemd-binfmt only, mmdebstrap throws "E: <arch> can neither be executed natively nor via qemu user emulation with binfmt_misc"
+(( $emulation )) && { apackages+=('qemu-user-static'); (( $G_DISTRO < 7 )) && apackages+=('binfmt-support'); }
+
 G_AG_CHECK_INSTALL_PREREQ "${apackages[@]}"
+
+# Register QEMU binfmt configs
+if (( $emulation ))
+then
+	if (( $G_DISTRO < 7 ))
+	then
+		G_EXEC systemctl disable --now systemd-binfmt
+		G_EXEC systemctl restart binfmt-support
+	else
+		G_EXEC systemctl restart systemd-binfmt
+	fi
+fi
 
 ##########################################
 # Prepare container
@@ -307,8 +340,12 @@ then
 fi
 
 # Install test builds from dietpi.com if requested
-# shellcheck disable=SC2016
-[[ $TEST == 'true' ]] && G_EXEC sed --follow-symlinks -i '/# Start DietPi-Software/a\sed -i '\''s|dietpi.com/downloads/binaries/$G_DISTRO_NAME/|dietpi.com/downloads/binaries/$G_DISTRO_NAME/testing/|'\'' /boot/dietpi/dietpi-software' rootfs/boot/dietpi/dietpi-login
+if [[ $TEST == 'true' ]]
+then
+	# shellcheck disable=SC2016
+	G_EXEC sed --follow-symlinks -i '/# Start DietPi-Software/a\sed -i '\''s|dietpi.com/downloads/binaries/$G_DISTRO_NAME/|dietpi.com/downloads/binaries/$G_DISTRO_NAME/testing/|'\'' /boot/dietpi/dietpi-software' rootfs/boot/dietpi/dietpi-login
+	G_CONFIG_INJECT 'SOFTWARE_DIETPI_DASHBOARD_VERSION=' 'SOFTWARE_DIETPI_DASHBOARD_VERSION=Nightly' rootfs/boot/dietpi.txt
+fi
 
 # Workaround invalid TERM on login
 # shellcheck disable=SC2016
@@ -317,6 +354,7 @@ G_EXEC eval 'echo '\''infocmp "$TERM" > /dev/null 2>&1 || { echo "[ INFO ] Unsup
 # Enable automated setup
 G_CONFIG_INJECT 'AUTO_SETUP_AUTOMATED=' 'AUTO_SETUP_AUTOMATED=1' rootfs/boot/dietpi.txt
 # - Workaround for skipped autologin in emulated Trixie/Sid containers: https://gitlab.com/qemu-project/qemu/-/issues/1962
+# - Set HOME path, required e.g. go builds, which is otherwise missing when started from a systemd unit.
 if [[ $DISTRO == 'trixie' ]] && (( $G_HW_ARCH != $arch && ( $G_HW_ARCH > 9 || $G_HW_ARCH < $arch ) ))
 then
 	cat << '_EOF_' > rootfs/etc/systemd/system/dietpi-automation.service
@@ -327,6 +365,7 @@ After=dietpi-postboot.service
 [Service]
 Type=idle
 StandardOutput=tty
+Environment=HOME=/root
 ExecStart=/bin/dash -c 'infocmp "$TERM" > /dev/null 2>&1 || export TERM=dumb; exec /boot/dietpi/dietpi-login'
 ExecStop=/sbin/poweroff
 
@@ -422,5 +461,5 @@ G_EXEC sed --follow-symlinks -i 's|Prompt_on_Failure$|{ journalctl -n 50; ss -tu
 # Boot container
 ##########################################
 systemd-nspawn -bD rootfs
-[[ -f 'rootfs/success' ]] || { journalctl -n 25; ss -tulpn; df -h; free -h; exit 1; }
+[[ -f 'rootfs/success' ]] || { journalctl -n 25; ss -tlpn; df -h; free -h; exit 1; }
 }
