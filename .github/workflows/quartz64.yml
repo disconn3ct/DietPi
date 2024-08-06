@@ -17,7 +17,6 @@ jobs:
     # https://github.com/hendrikmuhs/ccache-action
     - name: ccache
       uses: hendrikmuhs/ccache-action@v1.2
-    # https://github.com/actions/setup-python/tags
     - uses: actions/setup-python@v5
       with:
         python-version: '3.x'
@@ -31,7 +30,7 @@ jobs:
         { curl -fLsS 'https://git.kernel.org/pub/scm/linux/kernel/git/stable/linux.git/snapshot/linux-rolling-stable.tar.gz' | tar xzf - ; } &
         uboot_version=$(curl -sSf 'https://api.github.com/repos/u-boot/u-boot/tags' | mawk -F\" '/^ *"name": "v[0-9.]*",$/{print $4;exit}')
         [ "$uboot_version" ] || { echo 'ERROR: Failed to obtain latest U-Boot version'; exit 1; }
-        { curl -fLsS "https://github.com/u-boot/u-boot/archive/v$uboot_version.tar.gz"| tar xzf - ; } &
+        { curl -fLsS "https://github.com/u-boot/u-boot/archive/$uboot_version.tar.gz"| tar xzf - ; } &
         uboot_version=${uboot_version#v}
         echo "uboot_version=$uboot_version" >> "$GITHUB_ENV"
         wait
@@ -185,3 +184,4 @@ jobs:
           ~/firmware-quartz64a.deb
           ~/firmware-quartz64b.deb
           ~/firmware-soquartz.deb
+
