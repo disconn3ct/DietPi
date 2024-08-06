@@ -68,7 +68,7 @@ jobs:
         cd linux-rolling-stable
         export PATH="/usr/lib/ccache:/usr/local/opt/ccache/libexec:$PATH"
         make quartz64_defconfig
-        make -j$(nproc)
+        make V=1 -j$(nproc)
         cp arch/arm64/boot/Image.gz ../firmware-quartz64a/boot/vmlinuz
         cp arch/arm64/boot/Image.gz ../firmware-quartz64b/boot/vmlinuz
         mv arch/arm64/boot/Image.gz ../firmware-soquartz/boot/vmlinuz
