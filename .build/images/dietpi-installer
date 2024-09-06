@@ -588,10 +588,11 @@ _EOF_
 		#------------------------------------------------------------------------------------------------
 
 		G_EXEC_DESC='Downloading source code' G_EXEC curl -sSfLO "https://github.com/$G_GITOWNER/DietPi/archive/$G_GITBRANCH.tar.gz"
-		[[ -d DietPi-$G_GITBRANCH ]] && G_EXEC_DESC='Removing old source code' G_EXEC rm -R "DietPi-$G_GITBRANCH"
-		G_EXEC_DESC='Unpacking source code' G_EXEC tar xf "$G_GITBRANCH.tar.gz"
-		G_EXEC_DESC='Removing unused files' G_EXEC rm -f "$G_GITBRANCH.tar.gz" "DietPi-$G_GITBRANCH/dietpi/"{pre-patch_file,patch_file,server_version-6}
-		G_EXEC_DESC='Hardening source code mode' G_EXEC chmod -R g-w "DietPi-$G_GITBRANCH"
+		local dir="DietPi-${G_GITBRANCH//\//-}" # GitHub translates forward slashes into dashes
+		[[ -d $dir ]] && G_EXEC_DESC='Removing old source code' G_EXEC rm -R "$dir"
+		G_EXEC_DESC='Unpacking source code' G_EXEC tar xf "${G_GITBRANCH##*/}.tar.gz" # Support for Git branch names with forward slashes
+		G_EXEC_DESC='Removing unused files' G_EXEC rm -f "${G_GITBRANCH##*/}.tar.gz" "$dir/"{pre-patch_file,patch_file,server_version-6}
+		G_EXEC_DESC='Hardening update archive mode' G_EXEC chmod -R g-w "$dir"
 
 		[[ -d '/boot' ]] || G_EXEC mkdir /boot
 
@@ -605,9 +606,9 @@ _EOF_
 			then
 				G_EXEC ln -sf firmware/cmdline.txt /boot/cmdline.txt
 				G_EXEC ln -sf firmware/config.txt /boot/config.txt
-				G_EXEC mv "DietPi-$G_GITBRANCH/.build/images/RPi/config.txt" /boot/firmware/
+				G_EXEC mv "$dir/.build/images/RPi/config.txt" /boot/firmware/
 			else
-				G_EXEC mv "DietPi-$G_GITBRANCH/.build/images/RPi/config.txt" /boot/
+				G_EXEC mv "$dir/.build/images/RPi/config.txt" /boot/
 			fi
 			echo "root=PARTUUID=$(findmnt -Ufnro PARTUUID -M /) rootfstype=$(findmnt -Ufnro FSTYPE -M /) rootwait net.ifnames=0 logo.nologo console=serial0,115200 console=tty1" > /boot/cmdline.txt
 			# Boot in 64-bit mode if this is a 64-bit image
@@ -618,26 +619,26 @@ _EOF_
 			armbian_packages=1
 			local model='OdroidC1'
 			(( $G_HW_MODEL == 11 )) && model='OdroidXU4'
-			G_EXEC mv "DietPi-$G_GITBRANCH/.build/images/$model/boot.ini" /boot/boot.ini
+			G_EXEC mv "$dir/.build/images/$model/boot.ini" /boot/boot.ini
 			G_EXEC sed --follow-symlinks -i "s/root=[^[:blank:]]*/root=UUID=$(findmnt -Ufnro UUID -M /)/" /boot/boot.ini
 			G_EXEC sed --follow-symlinks -i "s/rootfstype=[^[:blank:]]*/rootfstype=$(findmnt -Ufnro FSTYPE -M /)/" /boot/boot.ini
 			G_EXEC mkdir -p /etc/kernel/post{inst,rm}.d /etc/initramfs/post-update.d
-			G_EXEC mv "DietPi-$G_GITBRANCH/.build/images/U-Boot/dietpi-initramfs_cleanup" /etc/kernel/postinst.d/dietpi-initramfs_cleanup
+			G_EXEC mv "$dir/.build/images/U-Boot/dietpi-initramfs_cleanup" /etc/kernel/postinst.d/dietpi-initramfs_cleanup
 			G_EXEC ln -sf /etc/kernel/post{inst,rm}.d/dietpi-initramfs_cleanup
-			G_EXEC mv "DietPi-$G_GITBRANCH/.build/images/U-Boot/99-dietpi-uboot" /etc/initramfs/post-update.d/99-dietpi-uboot
+			G_EXEC mv "$dir/.build/images/U-Boot/99-dietpi-uboot" /etc/initramfs/post-update.d/99-dietpi-uboot
 			G_EXEC sed --follow-symlinks -i 's/arm64/arm/' /etc/initramfs/post-update.d/99-dietpi-uboot
 
 		elif [[ $G_HW_MODEL =~ ^(12|15|16|40|42|43|44|45|46|47|48|52|54|55|56|57|58|59|60|62|63|64|65|66|67|68|72|73|74|76|77|78|79|80|82|83|85|86|87|88|89|90)$ ]]
 		then
 			armbian_packages=1
-			G_EXEC mv "DietPi-$G_GITBRANCH/.build/images/U-Boot/boot.cmd" /boot/boot.cmd
-			G_EXEC mv "DietPi-$G_GITBRANCH/.build/images/U-Boot/dietpiEnv.txt" /boot/dietpiEnv.txt
+			G_EXEC mv "$dir/.build/images/U-Boot/boot.cmd" /boot/boot.cmd
+			G_EXEC mv "$dir/.build/images/U-Boot/dietpiEnv.txt" /boot/dietpiEnv.txt
 			G_CONFIG_INJECT 'rootdev=' "rootdev=UUID=$(findmnt -Ufnro UUID -M /)" /boot/dietpiEnv.txt
 			G_CONFIG_INJECT 'rootfstype=' "rootfstype=$(findmnt -Ufnro FSTYPE -M /)" /boot/dietpiEnv.txt
 			G_EXEC mkdir -p /etc/kernel/post{inst,rm}.d /etc/initramfs/post-update.d
-			G_EXEC mv "DietPi-$G_GITBRANCH/.build/images/U-Boot/dietpi-initramfs_cleanup" /etc/kernel/postinst.d/dietpi-initramfs_cleanup
+			G_EXEC mv "$dir/.build/images/U-Boot/dietpi-initramfs_cleanup" /etc/kernel/postinst.d/dietpi-initramfs_cleanup
 			G_EXEC ln -sf /etc/kernel/post{inst,rm}.d/dietpi-initramfs_cleanup
-			G_EXEC mv "DietPi-$G_GITBRANCH/.build/images/U-Boot/99-dietpi-uboot" /etc/initramfs/post-update.d/99-dietpi-uboot
+			G_EXEC mv "$dir/.build/images/U-Boot/99-dietpi-uboot" /etc/initramfs/post-update.d/99-dietpi-uboot
 			# Odroid C2: Fix USB device detection: https://github.com/MichaIng/DietPi/issues/5963
 			if (( $G_HW_MODEL == 12 ))
 			then
@@ -787,29 +788,34 @@ setenv rootuuid "true"' /boot/boot.cmd
 			# NanoPi M3/T3/Fire3 (64-bit)
 			elif (( $G_HW_MODEL == 62 ))
 			then
-				G_EXEC mv "DietPi-$G_GITBRANCH/.build/images/NanoPiM3/boot.cmd" /boot/boot.cmd
+				G_EXEC mv "$dir/.build/images/NanoPiM3/boot.cmd" /boot/boot.cmd
 				G_EXEC sed --follow-symlinks -i '/overlay/d' /boot/dietpiEnv.txt
 				G_EXEC sed --follow-symlinks -i 's/ttyAML0/ttySAC0/' /boot/dietpiEnv.txt
+				# Device tree
+				case $HW_VARIANT in
+					2) G_CONFIG_INJECT 'fdtfile=' 'fdtfile=s5p6818-nanopi-fire3.dtb' /boot/dietpiEnv.txt;;
+					*) G_CONFIG_INJECT 'fdtfile=' 'fdtfile=s5p6818-nanopi-m3.dtb' /boot/dietpiEnv.txt;;
+				esac
 			fi
 		fi
 
 		# shellcheck disable=SC2016
 		[[ -f '/etc/initramfs/post-update.d/99-dietpi-uboot' && $(findmnt -t vfat -M /boot) ]] && G_EXEC sed --follow-symlinks -i '/^ln -s/c\mv -v "/boot/uInitrd-$1" /boot/uInitrd' /etc/initramfs/post-update.d/99-dietpi-uboot # FAT does not support symlinks
 
-		G_EXEC mv "DietPi-$G_GITBRANCH/dietpi.txt" /boot/
-		G_EXEC mv "DietPi-$G_GITBRANCH/README.md" /boot/dietpi-README.md
-		G_EXEC mv "DietPi-$G_GITBRANCH/LICENSE" /boot/dietpi-LICENSE.txt
+		G_EXEC mv "$dir/dietpi.txt" /boot/
+		G_EXEC mv "$dir/README.md" /boot/dietpi-README.md
+		G_EXEC mv "$dir/LICENSE" /boot/dietpi-LICENSE.txt
 
 		# Reading version string for later use
 		# shellcheck source=.update/version source=/boot/dietpi/.version
-		. "DietPi-$G_GITBRANCH/.update/version"
+		. "$dir/.update/version"
 		G_DIETPI_VERSION_CORE=$G_REMOTE_VERSION_CORE
 		G_DIETPI_VERSION_SUB=$G_REMOTE_VERSION_SUB
 		G_DIETPI_VERSION_RC=$G_REMOTE_VERSION_RC
 
-		G_EXEC_DESC='Copy DietPi scripts to /boot/dietpi' G_EXEC cp -a "DietPi-$G_GITBRANCH/dietpi" /boot/
-		G_EXEC_DESC='Copy DietPi system files in place' G_EXEC cp -a "DietPi-$G_GITBRANCH/rootfs/." /
-		G_EXEC_DESC='Clean download location' G_EXEC rm -R "DietPi-$G_GITBRANCH"
+		G_EXEC_DESC='Copy DietPi scripts to /boot/dietpi' G_EXEC cp -a "$dir/dietpi" /boot/
+		G_EXEC_DESC='Copy DietPi system files in place' G_EXEC cp -a "$dir/rootfs/." /
+		G_EXEC_DESC='Clean download location' G_EXEC rm -R "$dir"
 
 		G_DIETPI-NOTIFY 2 'Storing DietPi version info:'
 		G_CONFIG_INJECT 'DEV_GITBRANCH=' "DEV_GITBRANCH=$G_GITBRANCH" /boot/dietpi.txt
@@ -1049,15 +1055,23 @@ setenv rootuuid "true"' /boot/boot.cmd
 			[[ -f '/etc/apt/trusted.gpg~' ]] && G_EXEC rm '/etc/apt/trusted.gpg~'
 
 			# Remove obsolete lists
-			find /etc/apt/sources.list.d -mindepth 1 ! -name 'dietpi.list' -exec rm -v {} +
+			find /etc/apt/sources.list.d -mindepth 1 ! -name 'dietpi.list' -exec rm -Rv {} +
 
-			# Armbian base images: Downgrade base-files package to the version provided by Debian
-			dpkg --compare-versions "$(dpkg-query -Wf '${Version}' base-files)" gt 20 && G_EXEC eval 'echo '\''APT::Get::Allow-Downgrades "1";'\'' > /etc/apt/apt.conf.d/dietpi-armbian'
+			if dpkg --compare-versions "$(dpkg-query -Wf '${Version}' base-files)" gt 20
+			then
+				G_DIETPI-NOTIFY 2 'Enforcing downgrade of Armbian'\''s base-files package to Debian'\''s'
+				cat << '_EOF_' > /etc/apt/preferences.d/dietpi-armbian-tmp
+Package: base-files
+Pin: release o=Debian
+Pin-Priority: 1000
+_EOF_
+				G_EXEC eval 'echo '\''APT::Get::Allow-Downgrades "1";'\'' > /etc/apt/apt.conf.d/dietpi-armbian'
+			fi
 
 			# Select kernel, device tree and U-Boot packages
 			local model='odroidn2' kernel='meson64' arch='arm64' branch='current' zstd=()
 			case $G_HW_MODEL in
-				10) model='odroidc1' kernel='meson' arch='arm';;
+				10) model='odroidc1' kernel='meson' arch='arm' branch='edge';;
 				11) model='odroidxu4' kernel='odroidxu4' arch='arm';;
 				12) model='odroidc2';;
 				16) model='odroidc4';;
@@ -1263,7 +1277,7 @@ _EOF_
 				# tiny-initramfs to satisfy dependency: https://github.com/RPi-Distro/repo/issues/358
 				G_AGI raspi-firmware
 				G_CONFIG_INJECT 'SKIP_INITRAMFS_GEN=' 'SKIP_INITRAMFS_GEN=yes' /etc/default/raspi-firmware
-				G_AGI "${kernel[@]}" raspi-utils raspberrypi-sys-mods raspberrypi-archive-keyring "${a32bit[@]}" tiny-initramfs
+				G_AGI "${kernel[@]}" raspi-utils-core raspberrypi-sys-mods raspberrypi-archive-keyring "${a32bit[@]}" tiny-initramfs
 				G_EXEC apt-mark auto tiny-initramfs
 				G_EXEC rm -f /boot/initrd.img-* /boot/firmware/initramfs*
 			else
@@ -1401,7 +1415,7 @@ _EOF_
 			[[ -f '/etc/apt/trusted.gpg~' ]] && G_EXEC rm '/etc/apt/trusted.gpg~'
 
 			# Remove obsolete components from Armbian list and connect via HTTPS
-			find /etc/apt/sources.list.d -mindepth 1 ! -name 'dietpi.list' -exec rm -v {} +
+			find /etc/apt/sources.list.d -mindepth 1 ! -name 'dietpi.list' -exec rm -Rv {} +
 			G_EXEC eval "echo 'deb https://apt.armbian.com ${DISTRO_TARGET_NAME/bullseye/bookworm} main' > /etc/apt/sources.list.d/dietpi-armbian.list"
 
 			# Skip creating kernel symlinks and remove existing ones

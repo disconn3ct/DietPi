@@ -1,15 +1,34 @@
+v9.8
+(2024-09-21)
+
+Enhancements:
+- DietPi-Software | NoMachine: Our install option will now always download the latest NoMachine version, instead of a hardcoded one depending on the DietPi version. Many thanks to @tzvi208 for for figuring it out to version-agnostic download URLs: https://github.com/MichaIng/DietPi/issues/7198
+
+Bug fixes:
+- NanoPi M3/T3 | Resolved an issue where our recent image did not boot because the bootloader did not define a default device tree path anymore. Many thanks to @rozcietrzewiacz for reporting this issue: https://github.com/MichaIng/DietPi/issues/2630#issuecomment-2322085507
+- NanoPi R5S/R5C | Resolved an issue where the Ethernet LEDs did not work on systems upgraded from the legacy Linux 5.10 kernel. Many thanks to @innovodev for reporting this issue: https://dietpi.com/forum/t/21026
+- DietPi-Config | Resolved an issue where username and password in proxy settings could not be cleared, since the inputbox kept asking for an non-empty input. Many thanks to @dipisoft for reporting this issue: https://github.com/MichaIng/DietPi/issues/7211
+- DietPi-Software | NoMachine: Resolved an issue where the installation failed due to an outdated download URL. Many thanks to @tzvi208 for reporting this issue: https://github.com/MichaIng/DietPi/issues/7198
+
+As always, many smaller code performance and stability improvements, visual and spelling fixes have been done, too much to list all of them here. Check out all code changes of this release on GitHub: https://github.com/MichaIng/DietPi/pull/ADDME
+
+-----------------------------------------------------------------------------------------------------------
+
 v9.7
-(2024-08-03)
+(2024-08-25)
 
 Enhancements:
 - Odroid N2 | Added an option to update (flash) the SPI bootloader to the dietpi-config "Advanced Options" menu.
+- Odroid C1 | This DietPi update performs a migration of all Odroid C1 systems which run in "current" branch Linux 6.6 to edge branch kernel with Linux 6.9 or later. This solves non-functional USB ports: https://github.com/MichaIng/DietPi/issues/7089
+- NanoPi R5S/R5C/R6S/R6C/T6, Orange Pi 5/5 Plus, ROCK 5 | New RK3588 images will be shipped with Linux 6.1 from now on. This DietPi update offers a migration from the legacy Linux 5.10 kernel to this "vendor" Linux 6.1 kernel, from newer and cleaner Rockchip kernel sources. Old NanoPi R5S/R5C images with 8 partitions setup will be migrated to mainline Linux 6.6. Aside of new kernel features, it provides cleaner higher quality code, so we generally recommend the upgrade. However, we do not enforce it, and it makes sense to have a backup in place, and you can do the migration any time later. Next DietPi update, unless there were serious issue reported with the migration, we will enforce it for everyone, to get all RK3588 and NanoPi R5S/R5C systems up to a further supported and updated kernel source.
+- DietPi-Banner | An option has been added to show the CPU load as common 1/5/15 minutes averages. Many thanks to @rkok for implementing this feature: https://github.com/MichaIng/DietPi/pull/7186
 
 Bug fixes:
 - DietPi-Software | Box86/Box64: Resolved an issue where the installation failed because of a false directory removal attempt. Many thanks to @lukaszsobala for fixing this issue: https://github.com/MichaIng/DietPi/pull/7149
-- DietPi-Software | Bazarr: Resolved an issue where service stops and restarts were hanging until timeout, leading also to hanging system shutdowns and restarts. Many thansk to @clarky000 and @blablazzz for reporting this issue, and @gregordinary for pointing us to the solution: https://dietpi.com/forum/t/19610
+- DietPi-Software | Bazarr: Resolved an issue where service stops and restarts were hanging until timeout, leading also to hanging system shutdowns and restarts. Many thanks to @clarky000 and @blablazzz for reporting this issue, and @gregordinary for pointing us to the solution: https://dietpi.com/forum/t/19610
 - DietPi-Software | WiFi Hotspot: Resolved an issue where the hotspot failed because of an unintended character in the interface configuration. Many thanks to @wimduk for reporting this issue: https://dietpi.com/forum/t/20744
 
-As always, many smaller code performance and stability improvements, visual and spelling fixes have been done, too much to list all of them here. Check out all code changes of this release on GitHub: https://github.com/MichaIng/DietPi/pull/ADDME
+As always, many smaller code performance and stability improvements, visual and spelling fixes have been done, too much to list all of them here. Check out all code changes of this release on GitHub: https://github.com/MichaIng/DietPi/pull/7193
 
 -----------------------------------------------------------------------------------------------------------
 
