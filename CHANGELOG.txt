@@ -3,12 +3,15 @@ v9.8
 
 Enhancements:
 - DietPi-Software | NoMachine: Our install option will now always download the latest NoMachine version, instead of a hardcoded one depending on the DietPi version. Many thanks to @tzvi208 for for figuring it out to version-agnostic download URLs: https://github.com/MichaIng/DietPi/issues/7198
+- DietPi-Software | Portainer: It has been enabled to accept private/custom CA certificates by using the trusted CA certificates of the host, instead of the ones shipped with the container image. Many thanks to @oldboys92 for implementing this enhancement: https://github.com/MichaIng/DietPi/pull/7217
 
 Bug fixes:
 - NanoPi M3/T3 | Resolved an issue where our recent image did not boot because the bootloader did not define a default device tree path anymore. Many thanks to @rozcietrzewiacz for reporting this issue: https://github.com/MichaIng/DietPi/issues/2630#issuecomment-2322085507
 - NanoPi R5S/R5C | Resolved an issue where the Ethernet LEDs did not work on systems upgraded from the legacy Linux 5.10 kernel. Many thanks to @innovodev for reporting this issue: https://dietpi.com/forum/t/21026
+- DietPi-Services | Resolved an issue where the nfs-kernel-server service did show mode "alias". "nfs-kernel-server" is indeed an alias for the actual service name "nfs-server", which is now used.
 - DietPi-Config | Resolved an issue where username and password in proxy settings could not be cleared, since the inputbox kept asking for an non-empty input. Many thanks to @dipisoft for reporting this issue: https://github.com/MichaIng/DietPi/issues/7211
 - DietPi-Software | NoMachine: Resolved an issue where the installation failed due to an outdated download URL. Many thanks to @tzvi208 for reporting this issue: https://github.com/MichaIng/DietPi/issues/7198
+- DietPi-Software | Raspotify: Resolved an issue where the service failed to start with the latest Raspotify release, since it contains a config, incompatible with the bundles librespot: https://github.com/dtcooper/raspotify/pull/674
 
 As always, many smaller code performance and stability improvements, visual and spelling fixes have been done, too much to list all of them here. Check out all code changes of this release on GitHub: https://github.com/MichaIng/DietPi/pull/ADDME
 
