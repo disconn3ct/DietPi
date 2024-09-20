@@ -12,6 +12,11 @@ jobs:
       CROSS_COMPILE: 'aarch64-linux-gnu-'
       ARCH: 'arm64'
     steps:
+    - name: Apt update for 'gh act'
+      run: "{ sudo apt-get -q update;}"
+    # https://github.com/hendrikmuhs/ccache-action
+    - name: ccache
+      uses: hendrikmuhs/ccache-action@v1.2
     - uses: actions/setup-python@v5
       with:
         python-version: '3.x'
@@ -22,10 +27,10 @@ jobs:
         sudo apt-get -qq autopurge needrestart
         { python3 -m pip install --no-cache-dir -U pip setuptools wheel; python3 -m pip install --no-cache-dir -U pyelftools; } &
         { sudo apt-get -q update; sudo DEBIAN_FRONTEND=noninteractive apt-get --no-install-recommends -qq install make gcc libc6-dev flex bison gcc-aarch64-linux-gnu bc libssl-dev swig; } &
-        { curl -fO 'https://git.kernel.org/pub/scm/linux/kernel/git/stable/linux.git/snapshot/linux-rolling-stable.tar.gz'; tar xf linux-rolling-stable.tar.gz; rm linux-rolling-stable.tar.gz; } &
+        { curl -fLsS 'https://git.kernel.org/pub/scm/linux/kernel/git/stable/linux.git/snapshot/linux-rolling-stable.tar.gz' | tar xzf - ; } &
         uboot_version=$(curl -sSf 'https://api.github.com/repos/u-boot/u-boot/tags' | mawk -F\" '/^ *"name": "v[0-9.]*",$/{print $4;exit}')
         [ "$uboot_version" ] || { echo 'ERROR: Failed to obtain latest U-Boot version'; exit 1; }
-        { curl -fLO "https://github.com/u-boot/u-boot/archive/$uboot_version.tar.gz"; tar xf "$uboot_version.tar.gz"; rm "$uboot_version.tar.gz"; } &
+        { curl -fLsS "https://github.com/u-boot/u-boot/archive/$uboot_version.tar.gz"| tar xzf - ; } &
         uboot_version=${uboot_version#v}
         echo "uboot_version=$uboot_version" >> "$GITHUB_ENV"
         wait
@@ -41,6 +46,7 @@ jobs:
         wait
     - name: Build U-Boot
       run: |
+        export PATH="/usr/lib/ccache:/usr/local/opt/ccache/libexec:$PATH"
         export ROCKCHIP_TPL='ddr.bin'
         export BL31='bl31.elf'
         cd "u-boot-$uboot_version"
@@ -60,8 +66,9 @@ jobs:
     - name: Build Linux
       run: |
         cd linux-rolling-stable
+        export PATH="/usr/lib/ccache:/usr/local/opt/ccache/libexec:$PATH"
         make quartz64_defconfig
-        make -j$(nproc)
+        make V=1 -j$(nproc)
         cp arch/arm64/boot/Image.gz ../firmware-quartz64a/boot/vmlinuz
         cp arch/arm64/boot/Image.gz ../firmware-quartz64b/boot/vmlinuz
         mv arch/arm64/boot/Image.gz ../firmware-soquartz/boot/vmlinuz
@@ -168,12 +175,13 @@ jobs:
         dpkg-deb -b -Zxz -z9 -Sextreme firmware-quartz64b
         dpkg-deb -b -Zxz -z9 -Sextreme firmware-soquartz
         sudo rm -R firmware-quartz64a firmware-quartz64b firmware-soquartz
+        cp *.deb ~/
     - name: Upload
-      run: |
-        [ -d ~/.ssh ] || mkdir ~/.ssh
-        umask 377
-        echo '${{ secrets.KNOWN_HOSTS }}' > ~/.ssh/known_hosts
-        echo '${{ secrets.SSH_KEY }}' > ~/.ssh/id_ed25519
-        curl -T "firmware-{quartz64a,quartz64b,soquartz}.deb" --key ~/.ssh/id_ed25519 '${{ secrets.UPLOAD_URL }}all/'
-        curl 'https://api.cloudflare.com/client/v4/zones/${{ secrets.CF_ZONE }}/purge_cache' -H 'Authorization: Bearer ${{ secrets.CF_TOKEN }}' -H 'Content-Type: application/json' \
-        --data '{"files":["https://dietpi.com/downloads/binaries/testing/","https://dietpi.com/downloads/binaries/testing/firmware-quartz64a.deb","https://dietpi.com/downloads/binaries/testing/firmware-quartz64b.deb","https://dietpi.com/downloads/binaries/testing/firmware-soquartz.deb"]}'
+      uses: actions/upload-artifact@v3
+      with:
+        name: firmware-images
+        path: |
+          ~/firmware-quartz64a.deb
+          ~/firmware-quartz64b.deb
+          ~/firmware-soquartz.deb
+
